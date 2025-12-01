@@ -2,4 +2,4 @@
 html apps
 
 1999.
-[try judge](https://raw.githack.com/hipparchus2000/apps/master/judge.html)
+[try judge](https://raw.githack.com/hipparchus2000/apps/main/judge.html)
