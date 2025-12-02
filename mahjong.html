@@ -7,16 +7,16 @@
     <title>Mahjong Solitaire</title>
     <style>
         :root {
-            --bg-color: #2c3e50;
-            --board-bg: #27ae60;
-            --tile-width: 50px;
-            --tile-height: 70px;
+            --bg-color: #006400;
+            --board-bg: #006400;
+            --tile-width: 42px;
+            --tile-height: 58px;
             --tile-depth: 6px;
-            --tile-color: #ecf0f1;
-            --tile-shadow: #bdc3c7;
+            --tile-color: #f5f5dc;
+            --tile-shadow: #333;
             --tile-border: #95a5a6;
             --accent-color: #e74c3c;
-            --text-color: #ecf0f1;
+            --text-color: #fff;
             --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
@@ -36,41 +36,46 @@
 
         header {
             width: 100%;
-            padding: 10px 20px;
+            padding: 8px 12px;
             background: rgba(0, 0, 0, 0.2);
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-sizing: border-box;
             z-index: 100;
+            flex-wrap: wrap;
+            gap: 8px;
         }
 
         h1 {
             margin: 0;
-            font-size: 1.5rem;
-            letter-spacing: 1px;
+            font-size: 1.2rem;
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
         }
 
         .controls {
             display: flex;
-            gap: 10px;
+            gap: 6px;
+            flex-shrink: 0;
         }
 
         button {
             background-color: var(--tile-color);
             border: none;
             border-radius: 4px;
-            padding: 8px 16px;
+            padding: 6px 12px;
             font-family: inherit;
             font-weight: bold;
+            font-size: 0.85rem;
             color: #2c3e50;
             cursor: pointer;
-            box-shadow: 0 4px 0 #bdc3c7;
+            box-shadow: 0 3px 0 #bdc3c7;
             transition: transform 0.1s, box-shadow 0.1s;
         }
 
         button:active {
-            transform: translateY(4px);
+            transform: translateY(3px);
             box-shadow: 0 0 0 #bdc3c7;
         }
 
@@ -80,8 +85,23 @@
 
         .status-bar {
             display: flex;
-            gap: 20px;
-            font-size: 1rem;
+            gap: 12px;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            align-items: center;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            cursor: pointer;
         }
 
         #game-board {
@@ -108,16 +128,23 @@
             width: var(--tile-width);
             height: var(--tile-height);
             background-color: var(--tile-color);
-            border: 1px solid var(--tile-border);
-            border-radius: 4px;
+            border-top: 3px solid #ffffff;
+            border-left: 3px solid #ffffff;
+            border-right: 3px solid #2a2a2a;
+            border-bottom: 3px solid #2a2a2a;
+            border-radius: 3px;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 2.5rem;
+            font-size: 4.5rem;
             cursor: pointer;
             box-shadow:
-                2px 2px 0 var(--tile-shadow),
-                3px 3px 0 rgba(0, 0, 0, 0.2);
+                inset 2px 2px 3px rgba(255, 255, 255, 0.7),
+                inset -2px -2px 3px rgba(0, 0, 0, 0.3),
+                3px 3px 6px rgba(0, 0, 0, 0.4),
+                5px 5px 10px rgba(0, 0, 0, 0.5),
+                8px 8px 16px rgba(0, 0, 0, 0.6),
+                10px 10px 20px rgba(0, 0, 0, 0.7);
             transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s;
             z-index: 1;
         }
@@ -126,27 +153,29 @@
         .tile::before {
             content: '';
             position: absolute;
-            left: -6px;
-            top: 6px;
-            width: 6px;
+            left: -10px;
+            top: 10px;
+            width: 10px;
             height: 100%;
-            background: #95a5a6;
+            background: linear-gradient(to right, #1a1a1a, #3a3a3a, #5a5a5a);
             transform: skewY(-45deg);
             transform-origin: right top;
-            border-left: 1px solid #7f8c8d;
+            border-left: 1px solid #0a0a0a;
+            box-shadow: -3px 0 6px rgba(0, 0, 0, 0.7);
         }
 
         .tile::after {
             content: '';
             position: absolute;
-            bottom: -6px;
-            left: -6px;
+            bottom: -10px;
+            left: -10px;
             width: 100%;
-            height: 6px;
-            background: #bdc3c7;
+            height: 10px;
+            background: linear-gradient(to bottom, #4a4a4a, #3a3a3a, #1a1a1a);
             transform: skewX(-45deg);
             transform-origin: right top;
-            border-bottom: 1px solid #7f8c8d;
+            border-bottom: 1px solid #0a0a0a;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
         }
 
         .tile.selected {
@@ -165,17 +194,17 @@
             background-color: #ffeaa7;
         }
 
-        .tile.blocked {
+        body.show-blocked .tile.blocked {
             color: rgba(0, 0, 0, 0.3);
             cursor: default;
             background-color: #dcdde1;
         }
 
-        .tile.blocked::before {
+        body.show-blocked .tile.blocked::before {
             background: #7f8c8d;
         }
 
-        .tile.blocked::after {
+        body.show-blocked .tile.blocked::after {
             background: #95a5a6;
         }
 
@@ -272,6 +301,45 @@
         .suit-seasons {
             color: #d35400;
         }
+
+        /* iPhone 12 and mobile optimizations */
+        @media (max-width: 430px) {
+            header {
+                padding: 6px 10px;
+            }
+
+            h1 {
+                font-size: 1rem;
+            }
+
+            button {
+                padding: 5px 10px;
+                font-size: 0.75rem;
+            }
+
+            .status-bar {
+                font-size: 0.8rem;
+                gap: 10px;
+            }
+
+            .checkbox-label {
+                font-size: 0.75rem;
+            }
+
+            .tile {
+                font-size: 3.8rem;
+            }
+
+            #game-board {
+                padding: 10px;
+            }
+        }
+
+        @media (max-height: 700px) {
+            .tile {
+                font-size: 3.5rem;
+            }
+        }
     </style>
 </head>
 
@@ -282,6 +350,10 @@
         <div class="status-bar">
             <span id="score-display">Pairs: 0</span>
             <span id="remaining-display">Tiles: 144</span>
+            <label class="checkbox-label">
+                <input type="checkbox" id="show-blocked-toggle">
+                <span>Grey blocked</span>
+            </label>
         </div>
         <div class="controls">
             <button id="btn-undo">Undo</button>
@@ -324,6 +396,15 @@
                 document.getElementById('btn-new-game').addEventListener('click', () => this.newGame());
                 document.getElementById('btn-undo').addEventListener('click', () => this.undo());
                 document.getElementById('btn-hint').addEventListener('click', () => this.hint());
+
+                // Bind show-blocked toggle
+                document.getElementById('show-blocked-toggle').addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        document.body.classList.add('show-blocked');
+                    } else {
+                        document.body.classList.remove('show-blocked');
+                    }
+                });
 
                 this.newGame();
             }
@@ -583,8 +664,8 @@
                 });
 
                 // Calculate size
-                const tileW = 50; // matches css
-                const tileH = 70;
+                const tileW = 42; // matches css
+                const tileH = 58;
                 const unitX = tileW / 2;
                 const unitY = tileH / 2;
 
@@ -599,6 +680,7 @@
                     el.className = `tile suit-${tile.type.toLowerCase()}`;
                     el.dataset.id = tile.id;
                     el.dataset.value = tile.value;
+                    el.dataset.layer = tile.z;
                     el.textContent = this.getSymbol(tile);
 
                     // Position
@@ -612,8 +694,8 @@
                     el.style.top = `${top}px`;
                     el.style.zIndex = zIndex;
 
-                    // 3D lift
-                    el.style.transform = `translateZ(${tile.z * 10}px)`;
+                    // 3D lift - Enhanced for clearer layer separation
+                    el.style.transform = `translateZ(${tile.z * 15}px) translateX(${-tile.z * 2}px) translateY(${-tile.z * 2}px)`;
 
                     el.onclick = (e) => {
                         e.stopPropagation();
