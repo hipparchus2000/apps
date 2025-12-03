@@ -7,27 +7,28 @@
     <title>Mahjong Solitaire</title>
     <style>
         :root {
-            --bg-color: #006400;
-            --board-bg: #006400;
-            --tile-width: 42px;
-            --tile-height: 58px;
-            --tile-depth: 6px;
+            --tile-width: 50px;
+            --tile-height: 66px;
             --tile-color: #f5f5dc;
-            --tile-shadow: #333;
-            --tile-border: #95a5a6;
-            --accent-color: #e74c3c;
-            --text-color: #fff;
-            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
             margin: 0;
             padding: 0;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: var(--font-family);
+            background: repeating-linear-gradient(45deg,
+                    #9b8b4f 0px,
+                    #9b8b4f 10px,
+                    #a09557 10px,
+                    #a09557 20px),
+                repeating-linear-gradient(-45deg,
+                    #a09557 0px,
+                    #a09557 10px,
+                    #9b8b4f 10px,
+                    #9b8b4f 20px);
+            background-blend-mode: multiply;
+            font-family: Arial, sans-serif;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
             height: 100vh;
             overflow: hidden;
@@ -35,69 +36,84 @@
         }
 
         header {
-            width: 100%;
-            padding: 8px 12px;
-            background: rgba(0, 0, 0, 0.2);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-sizing: border-box;
+            position: absolute;
+            top: 10px;
+            left: 10px;
             z-index: 100;
-            flex-wrap: wrap;
-            gap: 8px;
         }
 
         h1 {
             margin: 0;
-            font-size: 1.2rem;
-            letter-spacing: 0.5px;
-            flex-shrink: 0;
+            font-size: 2.5rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        h1 span:nth-child(1) {
+            color: #c00;
+        }
+
+        h1 span:nth-child(2) {
+            color: #080;
+        }
+
+        h1 span:nth-child(3) {
+            color: #00c;
         }
 
         .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
             display: flex;
-            gap: 6px;
-            flex-shrink: 0;
+            gap: 8px;
+            z-index: 100;
         }
 
         button {
-            background-color: var(--tile-color);
-            border: none;
+            padding: 8px 16px;
+            border: 1px solid #ccc;
             border-radius: 4px;
-            padding: 6px 12px;
-            font-family: inherit;
-            font-weight: bold;
-            font-size: 0.85rem;
-            color: #2c3e50;
+            background: linear-gradient(to bottom, #fff 0%, #e6e6e6 100%);
             cursor: pointer;
-            box-shadow: 0 3px 0 #bdc3c7;
-            transition: transform 0.1s, box-shadow 0.1s;
-        }
-
-        button:active {
-            transform: translateY(3px);
-            box-shadow: 0 0 0 #bdc3c7;
+            font-size: 0.9rem;
+            font-weight: normal;
+            color: #333;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+            transition: all 0.15s ease;
         }
 
         button:hover {
-            background-color: #fff;
+            background: linear-gradient(to bottom, #e6e6e6 0%, #d4d4d4 100%);
+            border-color: #adadad;
+        }
+
+        button:active {
+            transform: translateY(1px);
+            box-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
+            background: linear-gradient(to bottom, #d4d4d4 0%, #e6e6e6 100%);
         }
 
         .status-bar {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
             display: flex;
-            gap: 12px;
+            gap: 15px;
             font-size: 0.9rem;
-            flex-shrink: 0;
+            color: #fff;
+            z-index: 100;
             align-items: center;
         }
 
         .checkbox-label {
             display: flex;
             align-items: center;
-            gap: 4px;
-            font-size: 0.85rem;
+            gap: 5px;
             cursor: pointer;
             user-select: none;
+            color: #fff;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
         }
 
         .checkbox-label input[type="checkbox"] {
@@ -106,122 +122,114 @@
 
         #game-board {
             position: relative;
-            width: 100%;
-            flex-grow: 1;
-            background-color: var(--board-bg);
-            overflow: auto;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            perspective: 1000px;
+            background: linear-gradient(135deg, #7a8450 0%, #8a9460 50%, #7a8450 100%);
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.3),
+                0 10px 30px rgba(0, 0, 0, 0.5);
         }
 
         .board-container {
             position: relative;
-            /* Dimensions will be set by JS based on layout */
             transform-style: preserve-3d;
-            transition: transform 0.3s;
         }
 
         .tile {
             position: absolute;
             width: var(--tile-width);
             height: var(--tile-height);
-            background-color: var(--tile-color);
-            border-top: 3px solid #ffffff;
-            border-left: 3px solid #ffffff;
-            border-right: 3px solid #2a2a2a;
-            border-bottom: 3px solid #2a2a2a;
-            border-radius: 3px;
+            background: linear-gradient(135deg,
+                    #fdfdf8 0%,
+                    #f8f8ed 20%,
+                    #e5e5d5 60%,
+                    #d0d0c0 100%);
+            border: none;
+            border-radius: 6px;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 4.5rem;
+            font-size: 2.4rem;
             cursor: pointer;
-            box-shadow:
-                inset 2px 2px 3px rgba(255, 255, 255, 0.7),
-                inset -2px -2px 3px rgba(0, 0, 0, 0.3),
-                3px 3px 6px rgba(0, 0, 0, 0.4),
-                5px 5px 10px rgba(0, 0, 0, 0.5),
-                8px 8px 16px rgba(0, 0, 0, 0.6),
-                10px 10px 20px rgba(0, 0, 0, 0.7);
-            transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s;
-            z-index: 1;
+            box-shadow: inset 3px 3px 4px rgba(255, 255, 255, 0.95),
+                inset -3px -3px 4px rgba(0, 0, 0, 0.25),
+                5px 5px 10px rgba(0, 0, 0, 0.8),
+                3px 3px 0px rgba(0, 0, 0, 0.9);
+            transition: transform 0.1s;
         }
 
-        /* 3D layering effect */
         .tile::before {
             content: '';
             position: absolute;
-            left: -10px;
-            top: 10px;
-            width: 10px;
-            height: 100%;
-            background: linear-gradient(to right, #1a1a1a, #3a3a3a, #5a5a5a);
-            transform: skewY(-45deg);
-            transform-origin: right top;
-            border-left: 1px solid #0a0a0a;
-            box-shadow: -3px 0 6px rgba(0, 0, 0, 0.7);
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 4px solid;
+            border-color: #b0b0a0 #1a1a10 #1a1a10 #b0b0a0;
+            border-radius: 6px;
+            pointer-events: none;
         }
 
         .tile::after {
             content: '';
             position: absolute;
-            bottom: -10px;
-            left: -10px;
-            width: 100%;
-            height: 10px;
-            background: linear-gradient(to bottom, #4a4a4a, #3a3a3a, #1a1a1a);
-            transform: skewX(-45deg);
-            transform-origin: right top;
-            border-bottom: 1px solid #0a0a0a;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.7);
+            top: 4px;
+            left: 4px;
+            right: 4px;
+            bottom: 4px;
+            border: 1px solid #2a2a20;
+            border-radius: 4px;
+            pointer-events: none;
         }
 
         .tile.selected {
-            background-color: #81ecec;
+            background: #ffd700;
             transform: translate(-2px, -2px);
-            box-shadow:
-                4px 4px 0 var(--tile-shadow),
-                5px 5px 0 rgba(0, 0, 0, 0.2);
-            border-color: #00cec9;
-            z-index: 100 !important;
-            /* Bring selected to top visually */
+            box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.7);
         }
 
         .tile.hint {
             animation: pulse 1.5s infinite;
-            background-color: #ffeaa7;
+            background: #ffeb3b;
         }
 
         body.show-blocked .tile.blocked {
-            color: rgba(0, 0, 0, 0.3);
+            opacity: 0.4;
             cursor: default;
-            background-color: #dcdde1;
         }
 
-        body.show-blocked .tile.blocked::before {
-            background: #7f8c8d;
+        .tile-content {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
         }
 
-        body.show-blocked .tile.blocked::after {
-            background: #95a5a6;
+        .tile-season-label {
+            font-family: Arial, sans-serif;
+            font-size: 0.5rem;
+            font-weight: bold;
+            color: #000;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .tile-season-img,
+        .tile-flower-img {
+            font-size: 1.4rem;
         }
 
         @keyframes pulse {
-            0% {
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(255, 234, 167, 0.7);
-            }
-
-            70% {
-                transform: scale(1.05);
-                box-shadow: 0 0 0 10px rgba(255, 234, 167, 0);
-            }
-
+            0%,
             100% {
                 transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(255, 234, 167, 0);
+            }
+
+            50% {
+                transform: scale(1.05);
             }
         }
 
@@ -301,66 +309,28 @@
         .suit-seasons {
             color: #d35400;
         }
-
-        /* iPhone 12 and mobile optimizations */
-        @media (max-width: 430px) {
-            header {
-                padding: 6px 10px;
-            }
-
-            h1 {
-                font-size: 1rem;
-            }
-
-            button {
-                padding: 5px 10px;
-                font-size: 0.75rem;
-            }
-
-            .status-bar {
-                font-size: 0.8rem;
-                gap: 10px;
-            }
-
-            .checkbox-label {
-                font-size: 0.75rem;
-            }
-
-            .tile {
-                font-size: 3.8rem;
-            }
-
-            #game-board {
-                padding: 10px;
-            }
-        }
-
-        @media (max-height: 700px) {
-            .tile {
-                font-size: 3.5rem;
-            }
-        }
     </style>
 </head>
 
 <body>
 
     <header>
-        <h1>Mahjong</h1>
-        <div class="status-bar">
-            <span id="score-display">Pairs: 0</span>
-            <span id="remaining-display">Tiles: 144</span>
-            <label class="checkbox-label">
-                <input type="checkbox" id="show-blocked-toggle">
-                <span>Grey blocked</span>
-            </label>
-        </div>
-        <div class="controls">
-            <button id="btn-undo">Undo</button>
-            <button id="btn-hint">Hint</button>
-            <button id="btn-new-game">New Game</button>
-        </div>
     </header>
+
+    <div class="controls">
+        <button id="btn-new-game">New</button>
+        <button id="btn-undo">Undo</button>
+        <button id="btn-hint">Hint</button>
+    </div>
+
+    <div class="status-bar">
+        <span id="score-display">Pairs: 0</span>
+        <span id="remaining-display">Tiles: 144</span>
+        <label class="checkbox-label">
+            <input type="checkbox" id="show-blocked-toggle">
+            <span>Grey blocked</span>
+        </label>
+    </div>
 
     <div id="game-board">
         <div id="board-container" class="board-container">
@@ -461,6 +431,50 @@
                 }
 
                 return String.fromCodePoint(code);
+            }
+
+            renderTileContent(el, tile) {
+                const content = document.createElement('div');
+                content.className = 'tile-content';
+
+                if (tile.type === 'Seasons') {
+                    // Render season tiles with text label and icon
+                    const seasonNames = ['SPRING', 'SUMMER', 'AUTUMN', 'WINTER'];
+                    const seasonIcons = ['🌸', '☀️', '🍂', '❄️'];
+                    const idx = tile.value - 1;
+
+                    const iconDiv = document.createElement('div');
+                    iconDiv.className = 'tile-season-img';
+                    iconDiv.textContent = seasonIcons[idx];
+
+                    const labelDiv = document.createElement('div');
+                    labelDiv.className = 'tile-season-label';
+                    labelDiv.textContent = seasonNames[idx];
+
+                    content.appendChild(iconDiv);
+                    content.appendChild(labelDiv);
+                } else if (tile.type === 'Flowers') {
+                    // Render flower tiles with text label and icon
+                    const flowerNames = ['PLUM', 'ORCHID', 'CHRYSAN', 'BAMBOO'];
+                    const flowerIcons = ['🌺', '🌼', '🌻', '🎋'];
+                    const idx = tile.value - 1;
+
+                    const iconDiv = document.createElement('div');
+                    iconDiv.className = 'tile-flower-img';
+                    iconDiv.textContent = flowerIcons[idx];
+
+                    const labelDiv = document.createElement('div');
+                    labelDiv.className = 'tile-season-label';
+                    labelDiv.textContent = flowerNames[idx];
+
+                    content.appendChild(iconDiv);
+                    content.appendChild(labelDiv);
+                } else {
+                    // Use unicode symbol for other tiles
+                    content.textContent = this.getSymbol(tile);
+                }
+
+                el.appendChild(content);
             }
 
             generateTurtleLayout() {
@@ -681,7 +695,9 @@
                     el.dataset.id = tile.id;
                     el.dataset.value = tile.value;
                     el.dataset.layer = tile.z;
-                    el.textContent = this.getSymbol(tile);
+
+                    // Create tile content
+                    this.renderTileContent(el, tile);
 
                     // Position
                     // x,y are in half-tile units.
