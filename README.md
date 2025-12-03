@@ -7,4 +7,4 @@ html apps
 
 [mahjonng](https://raw.githack.com/hipparchus2000/apps/main/mahjong.html)
 
-[solitaire](https://raw.githack.com/hipparchus2000/apps/main/Solitaire.html)
+[solitaire](https://raw.githack.com/hipparchus2000/apps/main/solitaire.html)
