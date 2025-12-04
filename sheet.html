@@ -407,18 +407,33 @@
             input.className = 'cell-input';
             input.value = cells[cellRef].value || '';
 
+            let handled = false;
+
             input.onblur = () => {
-                updateCellValue(row, col, input.value);
+                if (!handled) {
+                    updateCellValue(row, col, input.value);
+                }
             };
 
             input.onkeydown = (e) => {
                 if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handled = true;
+                    input.blur();
                     updateCellValue(row, col, input.value);
                     selectCell(row + 1, col);
                 } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handled = true;
+                    input.blur();
                     renderCell(row, col);
                 } else if (e.key === 'Tab') {
                     e.preventDefault();
+                    e.stopPropagation();
+                    handled = true;
+                    input.blur();
                     updateCellValue(row, col, input.value);
                     selectCell(row, col + 1);
                 }
@@ -568,9 +583,10 @@
             Object.assign(cellDisplay.style, cellData.format);
 
             const existingChild = td.firstChild;
-            if (existingChild) {
+            if (existingChild && existingChild.parentNode === td) {
                 existingChild.replaceWith(cellDisplay);
             } else {
+                td.innerHTML = '';
                 td.appendChild(cellDisplay);
             }
         }
@@ -929,9 +945,20 @@
                     editCell(selectedCell.row, selectedCell.col);
                     break;
                 case 'Delete':
+                    e.preventDefault();
+                    updateCellValue(selectedCell.row, selectedCell.col, '');
+                    break;
                 case 'Backspace':
                     e.preventDefault();
                     updateCellValue(selectedCell.row, selectedCell.col, '');
+                    editCell(selectedCell.row, selectedCell.col);
+                    break;
+                default:
+                    // If it's a printable character, start editing the cell
+                    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        editCell(selectedCell.row, selectedCell.col);
+                        // The character will be captured by the input field
+                    }
                     break;
             }
         });
