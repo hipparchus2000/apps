@@ -106,6 +106,10 @@
             outline-offset: -1px;
         }
 
+        .spreadsheet td.in-range {
+            background: #d6eaf8;
+        }
+
         .cell-display {
             width: 100%;
             height: 100%;
@@ -307,6 +311,8 @@
         const COLS = 26;
         let cells = {};
         let selectedCell = null;
+        let selectionStart = null;
+        let selectedRange = null;
         let clipboard = null;
 
         // Initialize spreadsheet
@@ -339,7 +345,7 @@
 
                     const cellDisplay = document.createElement('div');
                     cellDisplay.className = 'cell-display';
-                    cellDisplay.onclick = () => selectCell(row, col);
+                    cellDisplay.onclick = (e) => selectCell(row, col, e.shiftKey);
                     cellDisplay.ondblclick = () => editCell(row, col);
 
                     td.appendChild(cellDisplay);
@@ -378,23 +384,62 @@
             return { row, col };
         }
 
-        function selectCell(row, col) {
+        function selectCell(row, col, shiftKey = false) {
             if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return;
 
-            // Deselect previous
-            if (selectedCell) {
-                const prevTd = document.querySelector(`td[data-row="${selectedCell.row}"][data-col="${selectedCell.col}"]`);
-                if (prevTd) prevTd.classList.remove('selected');
+            // Clear previous range highlighting
+            document.querySelectorAll('td.in-range').forEach(td => td.classList.remove('in-range'));
+
+            if (shiftKey && selectionStart) {
+                // Range selection with shift
+                selectedRange = {
+                    startRow: Math.min(selectionStart.row, row),
+                    endRow: Math.max(selectionStart.row, row),
+                    startCol: Math.min(selectionStart.col, col),
+                    endCol: Math.max(selectionStart.col, col)
+                };
+
+                // Deselect previous single cell
+                if (selectedCell) {
+                    const prevTd = document.querySelector(`td[data-row="${selectedCell.row}"][data-col="${selectedCell.col}"]`);
+                    if (prevTd) prevTd.classList.remove('selected');
+                }
+
+                // Highlight range
+                for (let r = selectedRange.startRow; r <= selectedRange.endRow; r++) {
+                    for (let c = selectedRange.startCol; c <= selectedRange.endCol; c++) {
+                        const td = document.querySelector(`td[data-row="${r}"][data-col="${c}"]`);
+                        if (td) td.classList.add('in-range');
+                    }
+                }
+
+                // Update cell ref to show range
+                const startRef = getCellRef(selectedRange.startRow, selectedRange.startCol);
+                const endRef = getCellRef(selectedRange.endRow, selectedRange.endCol);
+                document.getElementById('cellRef').textContent = `${startRef}:${endRef}`;
+                document.getElementById('formulaBar').value = '';
+
+                selectedCell = { row, col };
+            } else {
+                // Single cell selection
+                selectedRange = null;
+
+                // Deselect previous
+                if (selectedCell) {
+                    const prevTd = document.querySelector(`td[data-row="${selectedCell.row}"][data-col="${selectedCell.col}"]`);
+                    if (prevTd) prevTd.classList.remove('selected');
+                }
+
+                // Select new
+                selectedCell = { row, col };
+                selectionStart = { row, col };
+                const td = document.querySelector(`td[data-row="${row}"][data-col="${col}"]`);
+                td.classList.add('selected');
+
+                const cellRef = getCellRef(row, col);
+                document.getElementById('cellRef').textContent = cellRef;
+                document.getElementById('formulaBar').value = cells[cellRef].value || '';
             }
-
-            // Select new
-            selectedCell = { row, col };
-            const td = document.querySelector(`td[data-row="${row}"][data-col="${col}"]`);
-            td.classList.add('selected');
-
-            const cellRef = getCellRef(row, col);
-            document.getElementById('cellRef').textContent = cellRef;
-            document.getElementById('formulaBar').value = cells[cellRef].value || '';
         }
 
         function editCell(row, col) {
@@ -576,7 +621,7 @@
             const cellDisplay = document.createElement('div');
             cellDisplay.className = 'cell-display';
             cellDisplay.textContent = cellData.display;
-            cellDisplay.onclick = () => selectCell(row, col);
+            cellDisplay.onclick = (e) => selectCell(row, col, e.shiftKey);
             cellDisplay.ondblclick = () => editCell(row, col);
 
             // Apply formatting
@@ -613,23 +658,71 @@
         function copyCell() {
             if (!selectedCell) return;
 
-            const cellRef = getCellRef(selectedCell.row, selectedCell.col);
-            clipboard = {
-                value: cells[cellRef].value,
-                format: { ...cells[cellRef].format }
-            };
+            if (selectedRange) {
+                // Copy range
+                clipboard = {
+                    isRange: true,
+                    data: [],
+                    rows: selectedRange.endRow - selectedRange.startRow + 1,
+                    cols: selectedRange.endCol - selectedRange.startCol + 1
+                };
 
-            console.log('Copied:', cellRef);
+                for (let r = selectedRange.startRow; r <= selectedRange.endRow; r++) {
+                    for (let c = selectedRange.startCol; c <= selectedRange.endCol; c++) {
+                        const cellRef = getCellRef(r, c);
+                        clipboard.data.push({
+                            value: cells[cellRef].value,
+                            format: { ...cells[cellRef].format }
+                        });
+                    }
+                }
+
+                const startRef = getCellRef(selectedRange.startRow, selectedRange.startCol);
+                const endRef = getCellRef(selectedRange.endRow, selectedRange.endCol);
+                console.log('Copied range:', `${startRef}:${endRef}`);
+            } else {
+                // Copy single cell
+                const cellRef = getCellRef(selectedCell.row, selectedCell.col);
+                clipboard = {
+                    isRange: false,
+                    value: cells[cellRef].value,
+                    format: { ...cells[cellRef].format }
+                };
+
+                console.log('Copied:', cellRef);
+            }
         }
 
         function pasteCell() {
             if (!selectedCell || !clipboard) return;
 
-            const cellRef = getCellRef(selectedCell.row, selectedCell.col);
-            cells[cellRef].value = clipboard.value;
-            cells[cellRef].format = { ...clipboard.format };
+            if (clipboard.isRange) {
+                // Paste range
+                let dataIndex = 0;
+                for (let r = 0; r < clipboard.rows; r++) {
+                    for (let c = 0; c < clipboard.cols; c++) {
+                        const targetRow = selectedCell.row + r;
+                        const targetCol = selectedCell.col + c;
 
-            updateCellValue(selectedCell.row, selectedCell.col, clipboard.value);
+                        if (targetRow < ROWS && targetCol < COLS) {
+                            const cellRef = getCellRef(targetRow, targetCol);
+                            const cellData = clipboard.data[dataIndex];
+
+                            cells[cellRef].value = cellData.value;
+                            cells[cellRef].format = { ...cellData.format };
+                            updateCellValue(targetRow, targetCol, cellData.value);
+                        }
+                        dataIndex++;
+                    }
+                }
+            } else {
+                // Paste single cell
+                const cellRef = getCellRef(selectedCell.row, selectedCell.col);
+                cells[cellRef].value = clipboard.value;
+                cells[cellRef].format = { ...clipboard.format };
+
+                updateCellValue(selectedCell.row, selectedCell.col, clipboard.value);
+            }
         }
 
         function saveSpreadsheet() {
