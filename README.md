@@ -13,3 +13,5 @@ APPS -click link to open
 
 [SpreadSheet](https://raw.githack.com/hipparchus2000/apps/main/sheet.html)
 
+[RichText Editor](https://raw.githack.com/hipparchus2000/apps/main/richtext-editor.html)
+
