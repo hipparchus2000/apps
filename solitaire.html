@@ -281,42 +281,87 @@
         }
 
         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .header {
+                gap: 8px;
+                margin-bottom: 15px;
+            }
+
             .pile {
-                width: 70px;
-                min-height: 100px;
+                width: 48px;
+                min-height: 67px;
+                border-width: 2px;
             }
 
             .card {
-                width: 70px;
-                height: 98px;
+                width: 48px;
+                height: 67px;
+            }
+
+            .top-row {
+                margin-bottom: 15px;
+                gap: 6px;
+            }
+
+            .stock-waste {
+                gap: 8px;
+            }
+
+            .foundations {
+                gap: 6px;
+            }
+
+            .tableau {
+                gap: 6px;
             }
 
             .tableau .pile {
-                width: 70px;
-                min-height: 350px;
+                width: 48px;
+                min-height: 280px;
             }
 
             .card-rank {
-                font-size: 12px;
+                font-size: 10px;
             }
 
             .card-suit {
-                font-size: 16px;
+                font-size: 13px;
                 margin-top: 1px;
             }
 
             .card-center {
-                font-size: 28px;
+                font-size: 22px;
             }
 
             .card.face-up {
-                padding: 4px;
+                padding: 3px;
+            }
+
+            .card-top {
+                line-height: 0.9;
+            }
+
+            .card-bottom {
+                line-height: 0.9;
             }
 
             button {
-                padding: 8px 16px;
-                font-size: 14px;
+                padding: 6px 12px;
+                font-size: 13px;
             }
+
+            .message {
+                padding: 30px 20px;
+            }
+
+            .message h2 {
+                font-size: 24px;
+                margin-bottom: 15px;
+            }
+
         }
     </style>
 </head>
@@ -716,7 +761,9 @@
 
                     this.tableau[col].forEach((card, index) => {
                         const cardEl = card.createElement();
-                        cardEl.style.top = `${index * 30}px`;
+                        const isMobile = window.innerWidth <= 768;
+                        const cardOffset = isMobile ? 20 : 30;
+                        cardEl.style.top = `${index * cardOffset}px`;
 
                         if (card.faceUp) {
                             cardEl.draggable = true;
