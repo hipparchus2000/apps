@@ -121,9 +121,15 @@
         }
 
         .card.selected {
-            border: 3px solid #ffff00;
-            box-shadow: 0 0 20px rgba(255,255,0,0.6);
-            transform: translateY(-10px);
+            border: 4px solid #ffff00 !important;
+            box-shadow: 0 0 20px rgba(255,255,0,0.8) !important;
+            transform: translateY(-10px) !important;
+            z-index: 100;
+        }
+
+        .pile.valid-target {
+            border-color: rgba(255,255,0,0.9) !important;
+            background: rgba(255,255,0,0.2) !important;
         }
 
         .card.face-down {
@@ -442,6 +448,23 @@
                     pile.addEventListener('dragover', (e) => this.handleDragOver(e));
                     pile.addEventListener('drop', (e) => this.handleDrop(e));
                 });
+
+                // Add global click handler for touch support
+                document.querySelector('.game-container').addEventListener('click', (e) => {
+                    const pile = e.target.closest('.pile');
+                    if (pile && !pile.id && (pile.classList.contains('foundation') || pile.classList.contains('tableau-pile'))) {
+                        // Only handle clicks directly on the pile background (empty space)
+                        if (e.target === pile || e.target.closest('.pile') === pile) {
+                            // Check if clicking on a card inside foundation - if so, treat as target
+                            const clickedCard = e.target.closest('.card');
+                            if (clickedCard && pile.classList.contains('foundation')) {
+                                this.handleTouchTarget(pile);
+                            } else if (e.target === pile) {
+                                this.handleTouchTarget(pile);
+                            }
+                        }
+                    }
+                });
             }
 
             newGame() {
@@ -665,9 +688,13 @@
                     const cardEl = card.createElement();
                     cardEl.draggable = true;
                     cardEl.addEventListener('dragstart', (e) => this.handleDragStart(e, [card], 'waste'));
-                    cardEl.addEventListener('dblclick', () => this.tryAutoMove(card, 'waste'));
+                    cardEl.addEventListener('dblclick', (e) => {
+                        e.preventDefault();
+                        this.tryAutoMove(card, 'waste');
+                    });
                     cardEl.addEventListener('click', (e) => {
                         e.stopPropagation();
+                        e.preventDefault();
                         this.handleTouchSelect([card], 'waste', cardEl);
                     });
                     wasteEl.appendChild(cardEl);
@@ -681,19 +708,11 @@
                         const card = foundation[foundation.length - 1];
                         foundationEl.appendChild(card.createElement());
                     }
-                    foundationEl.addEventListener('click', () => {
-                        this.handleTouchTarget(foundationEl);
-                    });
                 }
 
                 for (let col = 0; col < 7; col++) {
                     const pileEl = document.querySelector(`.tableau-pile[data-column="${col}"]`);
                     pileEl.innerHTML = '';
-                    pileEl.addEventListener('click', (e) => {
-                        if (e.target === pileEl) {
-                            this.handleTouchTarget(pileEl);
-                        }
-                    });
 
                     this.tableau[col].forEach((card, index) => {
                         const cardEl = card.createElement();
@@ -705,15 +724,20 @@
                                 const cards = this.tableau[col].slice(index);
                                 this.handleDragStart(e, cards, `tableau-${col}`);
                             });
-                            cardEl.addEventListener('dblclick', () => this.tryAutoMove(card, `tableau-${col}`));
+                            cardEl.addEventListener('dblclick', (e) => {
+                                e.preventDefault();
+                                this.tryAutoMove(card, `tableau-${col}`);
+                            });
                             cardEl.addEventListener('click', (e) => {
                                 e.stopPropagation();
+                                e.preventDefault();
                                 const cards = this.tableau[col].slice(index);
                                 this.handleTouchSelect(cards, `tableau-${col}`, cardEl);
                             });
                         } else {
                             cardEl.addEventListener('click', (e) => {
                                 e.stopPropagation();
+                                e.preventDefault();
                                 if (index === this.tableau[col].length - 1) {
                                     this.saveState();
                                     card.flip();
@@ -820,7 +844,21 @@
             }
 
             handleTouchSelect(cards, source, cardElement) {
+                // If clicking the same card, try to auto-move it first
                 if (this.selectedCards && this.selectedSource === source && this.selectedCards[0] === cards[0]) {
+                    // Try auto-move on second tap
+                    const card = cards[0];
+                    for (let suit of SUITS) {
+                        if (this.canPlaceOnFoundation(card, suit)) {
+                            this.saveState();
+                            this.draggedCards = this.selectedCards;
+                            this.dragSource = this.selectedSource;
+                            this.moveCards(this.selectedSource, `foundation-${suit}`);
+                            this.clearSelection();
+                            return;
+                        }
+                    }
+                    // If can't auto-move, deselect
                     this.clearSelection();
                     return;
                 }
@@ -834,6 +872,31 @@
                         card.element.classList.add('selected');
                     }
                 });
+
+                // Highlight valid targets
+                this.highlightValidTargets();
+            }
+
+            highlightValidTargets() {
+                if (!this.selectedCards) return;
+
+                const card = this.selectedCards[0];
+
+                // Check foundations
+                for (let suit of SUITS) {
+                    if (this.selectedCards.length === 1 && this.canPlaceOnFoundation(card, suit)) {
+                        const foundationEl = document.querySelector(`.foundation[data-suit="${suit}"]`);
+                        foundationEl.classList.add('valid-target');
+                    }
+                }
+
+                // Check tableau
+                for (let col = 0; col < 7; col++) {
+                    if (this.canPlaceOnTableau(card, col)) {
+                        const pileEl = document.querySelector(`.tableau-pile[data-column="${col}"]`);
+                        pileEl.classList.add('valid-target');
+                    }
+                }
             }
 
             handleTouchTarget(pile) {
@@ -874,6 +937,11 @@
                 }
                 this.selectedCards = null;
                 this.selectedSource = null;
+
+                // Remove all valid-target highlights
+                document.querySelectorAll('.valid-target').forEach(el => {
+                    el.classList.remove('valid-target');
+                });
             }
         }
 
