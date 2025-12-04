@@ -120,6 +120,12 @@
             cursor: grabbing;
         }
 
+        .card.selected {
+            border: 3px solid #ffff00;
+            box-shadow: 0 0 20px rgba(255,255,0,0.6);
+            transform: translateY(-10px);
+        }
+
         .card.face-down {
             background: linear-gradient(135deg, #c41e3a 0%, #8b0000 100%);
             border: 2px solid #fff;
@@ -419,6 +425,8 @@
                 this.history = [];
                 this.draggedCards = null;
                 this.dragSource = null;
+                this.selectedCards = null;
+                this.selectedSource = null;
                 this.init();
             }
 
@@ -658,6 +666,10 @@
                     cardEl.draggable = true;
                     cardEl.addEventListener('dragstart', (e) => this.handleDragStart(e, [card], 'waste'));
                     cardEl.addEventListener('dblclick', () => this.tryAutoMove(card, 'waste'));
+                    cardEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.handleTouchSelect([card], 'waste', cardEl);
+                    });
                     wasteEl.appendChild(cardEl);
                 }
 
@@ -669,11 +681,19 @@
                         const card = foundation[foundation.length - 1];
                         foundationEl.appendChild(card.createElement());
                     }
+                    foundationEl.addEventListener('click', () => {
+                        this.handleTouchTarget(foundationEl);
+                    });
                 }
 
                 for (let col = 0; col < 7; col++) {
                     const pileEl = document.querySelector(`.tableau-pile[data-column="${col}"]`);
                     pileEl.innerHTML = '';
+                    pileEl.addEventListener('click', (e) => {
+                        if (e.target === pileEl) {
+                            this.handleTouchTarget(pileEl);
+                        }
+                    });
 
                     this.tableau[col].forEach((card, index) => {
                         const cardEl = card.createElement();
@@ -686,8 +706,14 @@
                                 this.handleDragStart(e, cards, `tableau-${col}`);
                             });
                             cardEl.addEventListener('dblclick', () => this.tryAutoMove(card, `tableau-${col}`));
+                            cardEl.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const cards = this.tableau[col].slice(index);
+                                this.handleTouchSelect(cards, `tableau-${col}`, cardEl);
+                            });
                         } else {
-                            cardEl.addEventListener('click', () => {
+                            cardEl.addEventListener('click', (e) => {
+                                e.stopPropagation();
                                 if (index === this.tableau[col].length - 1) {
                                     this.saveState();
                                     card.flip();
@@ -791,6 +817,63 @@
                         return;
                     }
                 }
+            }
+
+            handleTouchSelect(cards, source, cardElement) {
+                if (this.selectedCards && this.selectedSource === source && this.selectedCards[0] === cards[0]) {
+                    this.clearSelection();
+                    return;
+                }
+
+                this.clearSelection();
+                this.selectedCards = cards;
+                this.selectedSource = source;
+
+                cards.forEach(card => {
+                    if (card.element) {
+                        card.element.classList.add('selected');
+                    }
+                });
+            }
+
+            handleTouchTarget(pile) {
+                if (!this.selectedCards) return;
+
+                const card = this.selectedCards[0];
+
+                if (pile.classList.contains('foundation')) {
+                    if (this.selectedCards.length === 1) {
+                        const suit = pile.dataset.suit;
+                        if (this.canPlaceOnFoundation(card, suit)) {
+                            this.saveState();
+                            this.draggedCards = this.selectedCards;
+                            this.dragSource = this.selectedSource;
+                            this.moveCards(this.selectedSource, `foundation-${suit}`);
+                            this.clearSelection();
+                        }
+                    }
+                } else if (pile.classList.contains('tableau-pile')) {
+                    const col = parseInt(pile.dataset.column);
+                    if (this.canPlaceOnTableau(card, col)) {
+                        this.saveState();
+                        this.draggedCards = this.selectedCards;
+                        this.dragSource = this.selectedSource;
+                        this.moveCards(this.selectedSource, `tableau-${col}`);
+                        this.clearSelection();
+                    }
+                }
+            }
+
+            clearSelection() {
+                if (this.selectedCards) {
+                    this.selectedCards.forEach(card => {
+                        if (card.element) {
+                            card.element.classList.remove('selected');
+                        }
+                    });
+                }
+                this.selectedCards = null;
+                this.selectedSource = null;
             }
         }
 
