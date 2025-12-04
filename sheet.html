@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spreadsheet App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .toolbar {
+            background: #2c3e50;
+            color: white;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .toolbar button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .toolbar button:hover {
+            background: #2980b9;
+        }
+
+        .toolbar input[type="color"],
+        .toolbar select {
+            height: 32px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .toolbar label {
+            font-size: 14px;
+            margin-left: 10px;
+        }
+
+        .spreadsheet-container {
+            flex: 1;
+            overflow: auto;
+            background: white;
+            position: relative;
+        }
+
+        .spreadsheet {
+            display: inline-block;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        .spreadsheet th {
+            background: #ecf0f1;
+            font-weight: 600;
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            text-align: center;
+            min-width: 100px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .spreadsheet .row-header {
+            background: #ecf0f1;
+            font-weight: 600;
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            text-align: center;
+            min-width: 40px;
+            position: sticky;
+            left: 0;
+            z-index: 5;
+        }
+
+        .spreadsheet td {
+            border: 1px solid #bdc3c7;
+            padding: 0;
+            min-width: 100px;
+            height: 30px;
+            position: relative;
+        }
+
+        .spreadsheet td.selected {
+            outline: 2px solid #3498db;
+            outline-offset: -1px;
+        }
+
+        .cell-display {
+            width: 100%;
+            height: 100%;
+            padding: 5px 8px;
+            cursor: cell;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .cell-input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            padding: 5px 8px;
+            font-family: inherit;
+            font-size: inherit;
+            outline: none;
+        }
+
+        .formula-bar {
+            background: #ecf0f1;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid #bdc3c7;
+        }
+
+        .formula-bar input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .cell-ref {
+            font-weight: 600;
+            min-width: 60px;
+            padding: 8px;
+            background: white;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+        }
+
+        .chart-container {
+            margin: 20px;
+            padding: 20px;
+            background: white;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        canvas {
+            max-width: 600px;
+            max-height: 400px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            min-width: 300px;
+            max-width: 500px;
+        }
+
+        .modal-content h3 {
+            margin-bottom: 15px;
+        }
+
+        .modal-content label {
+            display: block;
+            margin: 10px 0 5px 0;
+        }
+
+        .modal-content input,
+        .modal-content select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 15px;
+        }
+
+        .modal-buttons button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .modal-buttons .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .modal-buttons .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button onclick="saveSpreadsheet()">💾 Save</button>
+        <button onclick="loadSpreadsheet()">📂 Load</button>
+        <button onclick="copyCell()">📋 Copy</button>
+        <button onclick="pasteCell()">📄 Paste</button>
+
+        <label>Font:</label>
+        <select id="fontSelect" onchange="formatCell('fontFamily', this.value)">
+            <option value="Arial">Arial</option>
+            <option value="'Courier New'">Courier New</option>
+            <option value="'Times New Roman'">Times New Roman</option>
+            <option value="Verdana">Verdana</option>
+        </select>
+
+        <label>Size:</label>
+        <select id="fontSizeSelect" onchange="formatCell('fontSize', this.value)">
+            <option value="12px">12</option>
+            <option value="14px" selected>14</option>
+            <option value="16px">16</option>
+            <option value="18px">18</option>
+            <option value="20px">20</option>
+        </select>
+
+        <button onclick="formatCell('fontWeight', 'bold')"><b>B</b></button>
+        <button onclick="formatCell('fontStyle', 'italic')"><i>I</i></button>
+        <button onclick="formatCell('textDecoration', 'underline')"><u>U</u></button>
+
+        <label>Color:</label>
+        <input type="color" id="textColor" onchange="formatCell('color', this.value)">
+
+        <label>Background:</label>
+        <input type="color" id="bgColor" onchange="formatCell('backgroundColor', this.value)" value="#ffffff">
+
+        <button onclick="showChartModal()">📊 Insert Chart</button>
+    </div>
+
+    <div class="formula-bar">
+        <span class="cell-ref" id="cellRef">A1</span>
+        <input type="text" id="formulaBar" placeholder="Enter value or formula (=A1+B1)">
+    </div>
+
+    <div class="spreadsheet-container">
+        <table class="spreadsheet" id="spreadsheet">
+            <!-- Generated by JavaScript -->
+        </table>
+    </div>
+
+    <div id="chartModal" class="modal">
+        <div class="modal-content">
+            <h3>Insert Chart</h3>
+            <label>Chart Type:</label>
+            <select id="chartType">
+                <option value="line">Line Chart</option>
+                <option value="bar">Bar Chart</option>
+                <option value="pie">Pie Chart</option>
+            </select>
+
+            <label>Data Range (e.g., A1:B5):</label>
+            <input type="text" id="chartRange" placeholder="A1:B5">
+
+            <label>Chart Title:</label>
+            <input type="text" id="chartTitle" placeholder="My Chart">
+
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="closeChartModal()">Cancel</button>
+                <button class="btn-primary" onclick="insertChart()">Create Chart</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Spreadsheet state
+        const ROWS = 50;
+        const COLS = 26;
+        let cells = {};
+        let selectedCell = null;
+        let clipboard = null;
+
+        // Initialize spreadsheet
+        function init() {
+            const table = document.getElementById('spreadsheet');
+
+            // Header row
+            const headerRow = document.createElement('tr');
+            headerRow.appendChild(document.createElement('th')); // Corner cell
+            for (let i = 0; i < COLS; i++) {
+                const th = document.createElement('th');
+                th.textContent = String.fromCharCode(65 + i);
+                headerRow.appendChild(th);
+            }
+            table.appendChild(headerRow);
+
+            // Data rows
+            for (let row = 0; row < ROWS; row++) {
+                const tr = document.createElement('tr');
+                const rowHeader = document.createElement('td');
+                rowHeader.className = 'row-header';
+                rowHeader.textContent = row + 1;
+                tr.appendChild(rowHeader);
+
+                for (let col = 0; col < COLS; col++) {
+                    const td = document.createElement('td');
+                    const cellRef = getCellRef(row, col);
+                    td.dataset.row = row;
+                    td.dataset.col = col;
+
+                    const cellDisplay = document.createElement('div');
+                    cellDisplay.className = 'cell-display';
+                    cellDisplay.onclick = () => selectCell(row, col);
+                    cellDisplay.ondblclick = () => editCell(row, col);
+
+                    td.appendChild(cellDisplay);
+                    tr.appendChild(td);
+
+                    cells[cellRef] = {
+                        value: '',
+                        display: '',
+                        format: {}
+                    };
+                }
+                table.appendChild(tr);
+            }
+
+            // Formula bar events
+            const formulaBar = document.getElementById('formulaBar');
+            formulaBar.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && selectedCell) {
+                    updateCellValue(selectedCell.row, selectedCell.col, formulaBar.value);
+                    selectCell(selectedCell.row + 1, selectedCell.col);
+                }
+            });
+
+            selectCell(0, 0);
+        }
+
+        function getCellRef(row, col) {
+            return String.fromCharCode(65 + col) + (row + 1);
+        }
+
+        function parseCellRef(ref) {
+            const match = ref.match(/^([A-Z]+)(\d+)$/);
+            if (!match) return null;
+            const col = match[1].charCodeAt(0) - 65;
+            const row = parseInt(match[2]) - 1;
+            return { row, col };
+        }
+
+        function selectCell(row, col) {
+            if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return;
+
+            // Deselect previous
+            if (selectedCell) {
+                const prevTd = document.querySelector(`td[data-row="${selectedCell.row}"][data-col="${selectedCell.col}"]`);
+                if (prevTd) prevTd.classList.remove('selected');
+            }
+
+            // Select new
+            selectedCell = { row, col };
+            const td = document.querySelector(`td[data-row="${row}"][data-col="${col}"]`);
+            td.classList.add('selected');
+
+            const cellRef = getCellRef(row, col);
+            document.getElementById('cellRef').textContent = cellRef;
+            document.getElementById('formulaBar').value = cells[cellRef].value || '';
+        }
+
+        function editCell(row, col) {
+            const td = document.querySelector(`td[data-row="${row}"][data-col="${col}"]`);
+            const cellDisplay = td.querySelector('.cell-display');
+            const cellRef = getCellRef(row, col);
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'cell-input';
+            input.value = cells[cellRef].value || '';
+
+            input.onblur = () => {
+                updateCellValue(row, col, input.value);
+            };
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    updateCellValue(row, col, input.value);
+                    selectCell(row + 1, col);
+                } else if (e.key === 'Escape') {
+                    renderCell(row, col);
+                } else if (e.key === 'Tab') {
+                    e.preventDefault();
+                    updateCellValue(row, col, input.value);
+                    selectCell(row, col + 1);
+                }
+            };
+
+            cellDisplay.replaceWith(input);
+            input.focus();
+            input.select();
+        }
+
+        function updateCellValue(row, col, value) {
+            const cellRef = getCellRef(row, col);
+            cells[cellRef].value = value;
+
+            // Evaluate formula or set value
+            if (value.startsWith('=')) {
+                try {
+                    cells[cellRef].display = evaluateFormula(value.substring(1));
+                } catch (e) {
+                    cells[cellRef].display = '#ERROR!';
+                }
+            } else {
+                cells[cellRef].display = value;
+            }
+
+            renderCell(row, col);
+            recalculateAll();
+        }
+
+        function evaluateFormula(formula) {
+            // Replace cell references with values
+            let expression = formula.replace(/([A-Z]+\d+)/g, (match) => {
+                const cellData = cells[match];
+                if (!cellData) return '0';
+                const val = cellData.display || cellData.value || '0';
+                return isNaN(val) ? '0' : val;
+            });
+
+            // Handle common functions
+            expression = expression.replace(/SUM\(([^)]+)\)/gi, (match, range) => {
+                return sumRange(range);
+            });
+
+            expression = expression.replace(/AVG\(([^)]+)\)/gi, (match, range) => {
+                return avgRange(range);
+            });
+
+            expression = expression.replace(/MIN\(([^)]+)\)/gi, (match, range) => {
+                return minRange(range);
+            });
+
+            expression = expression.replace(/MAX\(([^)]+)\)/gi, (match, range) => {
+                return maxRange(range);
+            });
+
+            // Evaluate the expression
+            try {
+                return eval(expression);
+            } catch (e) {
+                return '#ERROR!';
+            }
+        }
+
+        function sumRange(range) {
+            const values = getRangeValues(range);
+            return values.reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+        }
+
+        function avgRange(range) {
+            const values = getRangeValues(range);
+            const sum = values.reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+            return values.length > 0 ? sum / values.length : 0;
+        }
+
+        function minRange(range) {
+            const values = getRangeValues(range).map(v => parseFloat(v) || 0);
+            return values.length > 0 ? Math.min(...values) : 0;
+        }
+
+        function maxRange(range) {
+            const values = getRangeValues(range).map(v => parseFloat(v) || 0);
+            return values.length > 0 ? Math.max(...values) : 0;
+        }
+
+        function getRangeValues(range) {
+            const values = [];
+
+            if (range.includes(':')) {
+                const [start, end] = range.split(':');
+                const startPos = parseCellRef(start);
+                const endPos = parseCellRef(end);
+
+                if (!startPos || !endPos) return values;
+
+                for (let r = startPos.row; r <= endPos.row; r++) {
+                    for (let c = startPos.col; c <= endPos.col; c++) {
+                        const ref = getCellRef(r, c);
+                        const val = cells[ref].display || cells[ref].value || '0';
+                        values.push(val);
+                    }
+                }
+            } else {
+                const refs = range.split(',');
+                refs.forEach(ref => {
+                    ref = ref.trim();
+                    if (cells[ref]) {
+                        const val = cells[ref].display || cells[ref].value || '0';
+                        values.push(val);
+                    }
+                });
+            }
+
+            return values;
+        }
+
+        function recalculateAll() {
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    const cellRef = getCellRef(row, col);
+                    const value = cells[cellRef].value;
+
+                    if (value && value.startsWith('=')) {
+                        try {
+                            cells[cellRef].display = evaluateFormula(value.substring(1));
+                            renderCell(row, col);
+                        } catch (e) {
+                            cells[cellRef].display = '#ERROR!';
+                            renderCell(row, col);
+                        }
+                    }
+                }
+            }
+        }
+
+        function renderCell(row, col) {
+            const td = document.querySelector(`td[data-row="${row}"][data-col="${col}"]`);
+            const cellRef = getCellRef(row, col);
+            const cellData = cells[cellRef];
+
+            const cellDisplay = document.createElement('div');
+            cellDisplay.className = 'cell-display';
+            cellDisplay.textContent = cellData.display;
+            cellDisplay.onclick = () => selectCell(row, col);
+            cellDisplay.ondblclick = () => editCell(row, col);
+
+            // Apply formatting
+            Object.assign(cellDisplay.style, cellData.format);
+
+            const existingChild = td.firstChild;
+            if (existingChild) {
+                existingChild.replaceWith(cellDisplay);
+            } else {
+                td.appendChild(cellDisplay);
+            }
+        }
+
+        function formatCell(property, value) {
+            if (!selectedCell) return;
+
+            const cellRef = getCellRef(selectedCell.row, selectedCell.col);
+
+            // Toggle for bold, italic, underline
+            if (property === 'fontWeight' && cells[cellRef].format.fontWeight === 'bold') {
+                cells[cellRef].format.fontWeight = 'normal';
+            } else if (property === 'fontStyle' && cells[cellRef].format.fontStyle === 'italic') {
+                cells[cellRef].format.fontStyle = 'normal';
+            } else if (property === 'textDecoration' && cells[cellRef].format.textDecoration === 'underline') {
+                cells[cellRef].format.textDecoration = 'none';
+            } else {
+                cells[cellRef].format[property] = value;
+            }
+
+            renderCell(selectedCell.row, selectedCell.col);
+        }
+
+        function copyCell() {
+            if (!selectedCell) return;
+
+            const cellRef = getCellRef(selectedCell.row, selectedCell.col);
+            clipboard = {
+                value: cells[cellRef].value,
+                format: { ...cells[cellRef].format }
+            };
+
+            console.log('Copied:', cellRef);
+        }
+
+        function pasteCell() {
+            if (!selectedCell || !clipboard) return;
+
+            const cellRef = getCellRef(selectedCell.row, selectedCell.col);
+            cells[cellRef].value = clipboard.value;
+            cells[cellRef].format = { ...clipboard.format };
+
+            updateCellValue(selectedCell.row, selectedCell.col, clipboard.value);
+        }
+
+        function saveSpreadsheet() {
+            const data = JSON.stringify(cells, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'spreadsheet.json';
+            a.click();
+
+            URL.revokeObjectURL(url);
+        }
+
+        function loadSpreadsheet() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        cells = data;
+
+                        // Re-render all cells
+                        for (let row = 0; row < ROWS; row++) {
+                            for (let col = 0; col < COLS; col++) {
+                                renderCell(row, col);
+                            }
+                        }
+
+                        recalculateAll();
+                    } catch (err) {
+                        alert('Error loading file: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            input.click();
+        }
+
+        // Chart functionality
+        function showChartModal() {
+            document.getElementById('chartModal').style.display = 'flex';
+        }
+
+        function closeChartModal() {
+            document.getElementById('chartModal').style.display = 'none';
+        }
+
+        function insertChart() {
+            const chartType = document.getElementById('chartType').value;
+            const chartRange = document.getElementById('chartRange').value;
+            const chartTitle = document.getElementById('chartTitle').value;
+
+            if (!chartRange) {
+                alert('Please specify a data range');
+                return;
+            }
+
+            try {
+                const data = getChartData(chartRange);
+                createChart(chartType, data, chartTitle);
+                closeChartModal();
+            } catch (e) {
+                alert('Error creating chart: ' + e.message);
+            }
+        }
+
+        function getChartData(range) {
+            const [start, end] = range.split(':');
+            const startPos = parseCellRef(start);
+            const endPos = parseCellRef(end);
+
+            if (!startPos || !endPos) {
+                throw new Error('Invalid range format');
+            }
+
+            const data = { labels: [], values: [] };
+
+            // Assume first column is labels, second column is values
+            for (let r = startPos.row; r <= endPos.row; r++) {
+                const labelRef = getCellRef(r, startPos.col);
+                const valueRef = getCellRef(r, startPos.col + 1);
+
+                const label = cells[labelRef].display || cells[labelRef].value || '';
+                const value = parseFloat(cells[valueRef].display || cells[valueRef].value || '0');
+
+                data.labels.push(label);
+                data.values.push(value);
+            }
+
+            return data;
+        }
+
+        function createChart(type, data, title) {
+            const container = document.createElement('div');
+            container.className = 'chart-container';
+
+            const titleElem = document.createElement('h3');
+            titleElem.textContent = title || 'Chart';
+            container.appendChild(titleElem);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 600;
+            canvas.height = 400;
+            container.appendChild(canvas);
+
+            document.querySelector('.spreadsheet-container').appendChild(container);
+
+            drawChart(canvas, type, data);
+        }
+
+        function drawChart(canvas, type, data) {
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const padding = 60;
+
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, width, height);
+
+            if (type === 'pie') {
+                drawPieChart(ctx, data, width, height);
+            } else if (type === 'bar') {
+                drawBarChart(ctx, data, width, height, padding);
+            } else if (type === 'line') {
+                drawLineChart(ctx, data, width, height, padding);
+            }
+        }
+
+        function drawPieChart(ctx, data, width, height) {
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = Math.min(width, height) / 3;
+
+            const total = data.values.reduce((sum, val) => sum + val, 0);
+            let currentAngle = -Math.PI / 2;
+
+            const colors = generateColors(data.values.length);
+
+            data.values.forEach((value, i) => {
+                const sliceAngle = (value / total) * 2 * Math.PI;
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[i];
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                currentAngle += sliceAngle;
+            });
+
+            // Draw legend
+            data.labels.forEach((label, i) => {
+                const y = 20 + i * 25;
+                ctx.fillStyle = colors[i];
+                ctx.fillRect(10, y, 15, 15);
+                ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
+                ctx.fillText(label + ': ' + data.values[i], 30, y + 12);
+            });
+        }
+
+        function drawBarChart(ctx, data, width, height, padding) {
+            const maxValue = Math.max(...data.values);
+            const barWidth = (width - padding * 2) / data.values.length - 10;
+            const chartHeight = height - padding * 2;
+
+            // Draw axes
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, height - padding);
+            ctx.lineTo(width - padding, height - padding);
+            ctx.stroke();
+
+            // Draw bars
+            const colors = generateColors(data.values.length);
+
+            data.values.forEach((value, i) => {
+                const barHeight = (value / maxValue) * chartHeight;
+                const x = padding + i * (barWidth + 10) + 10;
+                const y = height - padding - barHeight;
+
+                ctx.fillStyle = colors[i];
+                ctx.fillRect(x, y, barWidth, barHeight);
+
+                // Label
+                ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
+                ctx.save();
+                ctx.translate(x + barWidth / 2, height - padding + 15);
+                ctx.rotate(-Math.PI / 4);
+                ctx.fillText(data.labels[i], 0, 0);
+                ctx.restore();
+
+                // Value
+                ctx.fillText(value.toString(), x + barWidth / 2 - 10, y - 5);
+            });
+        }
+
+        function drawLineChart(ctx, data, width, height, padding) {
+            const maxValue = Math.max(...data.values);
+            const pointSpacing = (width - padding * 2) / (data.values.length - 1);
+            const chartHeight = height - padding * 2;
+
+            // Draw axes
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, height - padding);
+            ctx.lineTo(width - padding, height - padding);
+            ctx.stroke();
+
+            // Draw line
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+
+            data.values.forEach((value, i) => {
+                const x = padding + i * pointSpacing;
+                const y = height - padding - (value / maxValue) * chartHeight;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+
+            ctx.stroke();
+
+            // Draw points
+            data.values.forEach((value, i) => {
+                const x = padding + i * pointSpacing;
+                const y = height - padding - (value / maxValue) * chartHeight;
+
+                ctx.fillStyle = '#3498db';
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // Labels
+                ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
+                ctx.save();
+                ctx.translate(x, height - padding + 15);
+                ctx.rotate(-Math.PI / 4);
+                ctx.fillText(data.labels[i], 0, 0);
+                ctx.restore();
+
+                // Value
+                ctx.fillText(value.toString(), x - 10, y - 10);
+            });
+        }
+
+        function generateColors(count) {
+            const colors = [
+                '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6',
+                '#1abc9c', '#34495e', '#e67e22', '#95a5a6', '#d35400'
+            ];
+
+            const result = [];
+            for (let i = 0; i < count; i++) {
+                result.push(colors[i % colors.length]);
+            }
+            return result;
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (!selectedCell) return;
+
+            const input = document.querySelector('.cell-input');
+            if (input) return; // Don't navigate while editing
+
+            if (document.getElementById('formulaBar') === document.activeElement) return;
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    selectCell(selectedCell.row - 1, selectedCell.col);
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    selectCell(selectedCell.row + 1, selectedCell.col);
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    selectCell(selectedCell.row, selectedCell.col - 1);
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    selectCell(selectedCell.row, selectedCell.col + 1);
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    editCell(selectedCell.row, selectedCell.col);
+                    break;
+                case 'Delete':
+                case 'Backspace':
+                    e.preventDefault();
+                    updateCellValue(selectedCell.row, selectedCell.col, '');
+                    break;
+            }
+        });
+
+        // Initialize on load
+        window.onload = init;
+    </script>
+</body>
+</html>
