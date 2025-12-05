@@ -19,3 +19,5 @@ APPS -click link to open
 
 [RichText Editor](https://raw.githack.com/hipparchus2000/apps/main/richtext-editor.html)
 
+[Calculator Editor](https://raw.githack.com/hipparchus2000/apps/main/calc.html)
+
