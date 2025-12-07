@@ -2,3 +2,5 @@
 package-lock.json
 .claude/settings.local.json
 package.json
+client_secrets.json
+token.pickle
