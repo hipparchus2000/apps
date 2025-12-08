@@ -251,6 +251,9 @@
         let valueStack = [];
         let lastResult = null;
         let isLCD = false;
+        let displayMode = 'normal'; // normal, sci, eng
+        let fixedDecimals = null; // null = auto, or number of decimals
+        let enteringExponent = false; // true when entering exponent after EE
 
         const scientificButtons = [
             {text: '2nd', class: 'btn-function', action: 'toggle2nd', secondary: ''},
@@ -592,6 +595,23 @@
                 case 'mod':
                     handleBinaryFunction('mod');
                     break;
+                case 'ee':
+                    if (secondFunction) {
+                        // ENG mode
+                        displayMode = 'eng';
+                    } else {
+                        handleEE();
+                    }
+                    break;
+                case 'fix':
+                    if (secondFunction) {
+                        // SCI mode
+                        displayMode = 'sci';
+                    } else {
+                        // FIX mode - prompt for decimal places
+                        handleFIX();
+                    }
+                    break;
             }
 
             secondFunction = false;
@@ -600,11 +620,11 @@
         }
 
         function inputDigit(digit) {
-            if (waitingForOperand) {
+            if (waitingForOperand && !enteringExponent) {
                 display = digit.toString();
                 waitingForOperand = false;
             } else {
-                display = display === '0' ? digit.toString() : display + digit;
+                display = display === '0' && !enteringExponent ? digit.toString() : display + digit;
             }
         }
 
@@ -622,8 +642,13 @@
             // Remove last digit instead of clearing entire entry
             if (display.length > 1) {
                 display = display.slice(0, -1);
+                // Check if we removed the 'e' for exponent
+                if (display.indexOf('e') === -1 && display.indexOf('E') === -1) {
+                    enteringExponent = false;
+                }
             } else {
                 display = '0';
+                enteringExponent = false;
             }
             waitingForOperand = false;
         }
@@ -637,13 +662,21 @@
             valueStack = [];
             parenthesesLevel = 0;
             statisticalData = [];
+            displayMode = 'normal';
+            fixedDecimals = null;
+            enteringExponent = false;
         }
 
         function parseDisplayValue() {
             if (currentMode === 'programmer' && numberBase !== 10) {
                 return parseInt(display, numberBase) || 0;
             }
-            return parseFloat(display);
+            // parseFloat handles scientific notation (e.g., "1.5e3")
+            const value = parseFloat(display);
+            if (!isNaN(value)) {
+                enteringExponent = false; // Reset exponent entry mode
+            }
+            return value;
         }
 
         function handleOperator(op) {
@@ -919,6 +952,26 @@
             }
         }
 
+        function handleEE() {
+            if (enteringExponent) return; // Already entering exponent
+
+            // Add 'e' or 'E' to display to indicate exponent entry
+            if (display.indexOf('e') === -1 && display.indexOf('E') === -1) {
+                display += 'e';
+                enteringExponent = true;
+            }
+        }
+
+        function handleFIX() {
+            // Get current display value as decimal places
+            const decimals = parseInt(display);
+            if (!isNaN(decimals) && decimals >= 0 && decimals <= 9) {
+                fixedDecimals = decimals;
+                displayMode = 'fixed';
+                waitingForOperand = true;
+            }
+        }
+
         function formatResult(value) {
             if (isNaN(value) || !isFinite(value)) {
                 return 'Error';
@@ -927,12 +980,32 @@
             // Round to 11 digits of precision (TI-57 spec)
             const rounded = parseFloat(value.toPrecision(11));
 
-            // Format based on magnitude
+            // Apply display mode
+            if (displayMode === 'sci') {
+                return rounded.toExponential(fixedDecimals !== null ? fixedDecimals : 7);
+            } else if (displayMode === 'eng') {
+                return formatEngineering(rounded);
+            } else if (displayMode === 'fixed' && fixedDecimals !== null) {
+                return rounded.toFixed(fixedDecimals);
+            }
+
+            // Normal mode - Format based on magnitude
             if (Math.abs(rounded) >= 1e8 || (Math.abs(rounded) < 1e-8 && rounded !== 0)) {
                 return rounded.toExponential(7);
             }
 
             return rounded.toString();
+        }
+
+        function formatEngineering(value) {
+            if (value === 0) return '0';
+
+            const exponent = Math.floor(Math.log10(Math.abs(value)));
+            const engExponent = Math.floor(exponent / 3) * 3;
+            const mantissa = value / Math.pow(10, engExponent);
+
+            const decimals = fixedDecimals !== null ? fixedDecimals : 6;
+            return mantissa.toFixed(decimals) + 'E' + (engExponent >= 0 ? '+' : '') + engExponent;
         }
 
         // Keyboard event handler
