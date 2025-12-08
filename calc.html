@@ -27,6 +27,12 @@
             padding: 25px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
             width: 420px;
+            transition: background 0.3s ease;
+        }
+
+        .calculator.metallic {
+            background: linear-gradient(145deg, #c0c5ce, #a8adb8, #8f95a0, #c0c5ce);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.5);
         }
 
         .brand {
@@ -36,6 +42,11 @@
             margin-bottom: 10px;
             text-align: left;
             font-style: italic;
+            transition: color 0.3s ease;
+        }
+
+        .calculator.metallic .brand {
+            color: #000;
         }
 
         .model {
@@ -372,12 +383,15 @@
             isLCD = !isLCD;
             const displayEl = document.getElementById('display');
             const secondaryEl = document.getElementById('secondary-display');
+            const calculatorEl = document.querySelector('.calculator');
             if (isLCD) {
                 displayEl.classList.add('lcd');
                 secondaryEl.classList.add('lcd');
+                calculatorEl.classList.add('metallic');
             } else {
                 displayEl.classList.remove('lcd');
                 secondaryEl.classList.remove('lcd');
+                calculatorEl.classList.remove('metallic');
             }
         }
 
