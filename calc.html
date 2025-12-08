@@ -254,7 +254,7 @@
 
         const scientificButtons = [
             {text: '2nd', class: 'btn-function', action: 'toggle2nd', secondary: ''},
-            {text: 'INV', class: 'btn-function', action: 'inv', secondary: ''},
+            {text: 'Ans', class: 'btn-function', action: 'ans', secondary: ''},
             {text: 'lnx', class: 'btn-function', action: 'ln', secondary: 'eˣ'},
             {text: 'CE', class: 'btn-clear', action: 'ce', secondary: ''},
             {text: 'CLR', class: 'btn-clear', action: 'clr', secondary: ''},
@@ -474,6 +474,12 @@
                 case 'decimal':
                     inputDecimal();
                     break;
+                case 'ans':
+                    if (lastResult !== null) {
+                        display = lastResult.toString();
+                        waitingForOperand = false;
+                    }
+                    break;
                 case 'ce':
                     clearEntry();
                     break;
@@ -613,7 +619,12 @@
         }
 
         function clearEntry() {
-            display = '0';
+            // Remove last digit instead of clearing entire entry
+            if (display.length > 1) {
+                display = display.slice(0, -1);
+            } else {
+                display = '0';
+            }
             waitingForOperand = false;
         }
 
@@ -923,6 +934,77 @@
 
             return rounded.toString();
         }
+
+        // Keyboard event handler
+        document.addEventListener('keydown', function(event) {
+            // Prevent default behavior for keys we handle
+            const key = event.key;
+
+            // Number keys 0-9
+            if (key >= '0' && key <= '9') {
+                event.preventDefault();
+                handleButton(key);
+                return;
+            }
+
+            // Hex digits A-F
+            if (currentMode === 'programmer' && numberBase === 16) {
+                const upperKey = key.toUpperCase();
+                if ('ABCDEF'.includes(upperKey)) {
+                    event.preventDefault();
+                    handleButton(upperKey);
+                    return;
+                }
+            }
+
+            // Operators
+            switch(key) {
+                case '+':
+                    event.preventDefault();
+                    handleButton('add');
+                    break;
+                case '-':
+                    event.preventDefault();
+                    handleButton('subtract');
+                    break;
+                case '*':
+                    event.preventDefault();
+                    handleButton('multiply');
+                    break;
+                case '/':
+                    event.preventDefault();
+                    handleButton('divide');
+                    break;
+                case 'Enter':
+                case '=':
+                    event.preventDefault();
+                    handleButton('equals');
+                    break;
+                case 'c':
+                case 'C':
+                    event.preventDefault();
+                    handleButton('clr');
+                    break;
+                case 'Escape':
+                case 'Backspace':
+                    event.preventDefault();
+                    handleButton('ce');
+                    break;
+                case '.':
+                    event.preventDefault();
+                    handleButton('decimal');
+                    break;
+                case '(':
+                    event.preventDefault();
+                    handleButton('lparen');
+                    break;
+                case ')':
+                    event.preventDefault();
+                    secondFunction = true;
+                    handleButton('lparen');
+                    break;
+            }
+        });
 
         // Initialize calculator
         renderButtons();
