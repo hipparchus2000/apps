@@ -173,13 +173,13 @@ def main():
             print("No senders found in your inbox.")
             return
 
-        # Display top 50 senders
-        for rank, (email, count) in enumerate(sorted_senders[:50], 1):
+        # Display top 200 senders
+        for rank, (email, count) in enumerate(sorted_senders[:200], 1):
             # Format output for alignment
             print(f"{rank:4}. | {count:6} | {email}")
 
-        if len(sorted_senders) > 50:
-             print(f"\n... and {len(sorted_senders) - 50} more unique senders not shown.")
+        if len(sorted_senders) > 200:
+             print(f"\n... and {len(sorted_senders) - 200} more unique senders not shown.")
 
 
     except FileNotFoundError as e:
