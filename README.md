@@ -1,4 +1,7 @@
 # apps
+
+[HTML Version](https://raw.githack.com/hipparchus2000/apps/main/apps.html)
+
 GAMES - click Link to open
 
 [backgammon](https://raw.githack.com/hipparchus2000/apps/main/games/backgammon.html)
