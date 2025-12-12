@@ -3,6 +3,8 @@ GAMES - click Link to open
 
 [backgammon](https://raw.githack.com/hipparchus2000/apps/main/games/backgammon.html)
 
+[chicken darts](https://raw.githack.com/hipparchus2000/apps/main/games/chicken-darts.html)
+
 [decision fatigue](https://raw.githack.com/hipparchus2000/apps/main/games/decision.html)
 
 [mahjonng](https://raw.githack.com/hipparchus2000/apps/main/games/mahjong.html)
