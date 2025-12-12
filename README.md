@@ -11,6 +11,8 @@ GAMES - click Link to open
 
 [solitaire](https://raw.githack.com/hipparchus2000/apps/main/games/solitaire.html)
 
+[space invaders](https://raw.githack.com/hipparchus2000/apps/main/games/invaders.html)
+
 [platform](https://raw.githack.com/hipparchus2000/apps/main/games/platform.html)
 
 [swans](https://raw.githack.com/hipparchus2000/apps/main/games/swans.html)
