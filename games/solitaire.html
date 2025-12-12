@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Classic Klondike Solitaire card game">
+    <meta name="theme-color" content="#2d9f5a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Solitaire">
+    <link rel="manifest" href="./solitaire.manifest.json">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%232d9f5a'/%3E%3Crect x='20' y='20' width='28' height='40' rx='3' fill='white' stroke='%23333' stroke-width='1'/%3E%3Ctext x='26' y='36' font-size='10' font-weight='bold' fill='%23c41e3a'%3EA%3C/text%3E%3Ctext x='26' y='48' font-size='12' fill='%23c41e3a'%3E%E2%99%A5%3C/text%3E%3Crect x='52' y='20' width='28' height='40' rx='3' fill='white' stroke='%23333' stroke-width='1'/%3E%3Ctext x='58' y='36' font-size='10' font-weight='bold' fill='%23000'%3EK%3C/text%3E%3Ctext x='58' y='48' font-size='12' fill='%23000'%3E%E2%99%A0%3C/text%3E%3C/svg%3E">
     <title>Solitaire</title>
     <style>
         * {
@@ -993,6 +1000,19 @@
         }
 
         const game = new Game();
+
+        // Register service worker for PWA functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./solitaire-sw.js')
+                    .then((registration) => {
+                        console.log('ServiceWorker registration successful:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('ServiceWorker registration failed:', error);
+                    });
+            });
+        }
     </script>
 </body>
 </html>

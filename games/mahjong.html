@@ -4,6 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A classic Mahjong Solitaire game with turtle layout">
+    <meta name="theme-color" content="#7a8450">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Mahjong">
+    <link rel="manifest" href="./mahjong.manifest.json">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f5f5dc'/%3E%3Ctext x='50' y='70' font-size='50' text-anchor='middle'%3E🀄%3C/text%3E%3C/svg%3E">
     <title>Mahjong Solitaire</title>
     <style>
         :root {
@@ -944,6 +951,19 @@
 
         // Start game
         const game = new MahjongGame();
+
+        // Register service worker for PWA functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./mahjong-sw.js')
+                    .then((registration) => {
+                        console.log('ServiceWorker registration successful:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('ServiceWorker registration failed:', error);
+                    });
+            });
+        }
 
     </script>
 </body>

@@ -1,6 +1,7 @@
-/node_modules
-package-lock.json
+utils/package-lock.json
+utils/package.json
+utils/token.pickle
+utils/client_secrets.json
 .claude/settings.local.json
-package.json
-client_secrets.json
-token.pickle
+/utils/node_modules/
+
