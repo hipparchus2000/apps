@@ -80,20 +80,21 @@ def extract_email(from_string):
 def get_senders_count(service):
     """
     Fetches message IDs page by page, then fetches the 'From' header for each message
-    to count sender frequencies.
+    to count sender frequencies and domain frequencies.
     """
     sender_counts = Counter()
+    domain_counts = Counter()
     total_emails = 0
     page_token = None
     page_count = 0
 
     print("Starting full inbox analysis. This may take a while for large inboxes.")
-    
+
     # Loop to fetch messages, handling pagination (nextPageToken)
     while True:
         page_count += 1
         print(f"\n--- Fetching page {page_count} of message IDs... ---")
-        
+
         try:
             # 1. List messages (efficiently grabs IDs)
             results = service.users().messages().list(
@@ -110,7 +111,7 @@ def get_senders_count(service):
         if not messages:
             print("Finished fetching message IDs.")
             break
-        
+
         total_emails += len(messages)
         print(f"Found {len(messages)} messages on this page. Total IDs collected: {total_emails}")
 
@@ -130,14 +131,19 @@ def get_senders_count(service):
                 ).execute()
 
                 headers = msg.get('payload', {}).get('headers', [])
-                
+
                 # Find the 'From' header
                 from_header = next((h for h in headers if h['name'].lower() == 'from'), None)
-                
+
                 if from_header:
                     email = extract_email(from_header['value'])
                     sender_counts[email] += 1
-                
+
+                    # Extract domain from email address
+                    if '@' in email:
+                        domain = email.split('@')[1]
+                        domain_counts[domain] += 1
+
             except Exception as e:
                 # Log error and skip to the next message
                 print(f"   -> Could not fetch message ID {message['id']}: {e}. Skipping.")
@@ -149,26 +155,44 @@ def get_senders_count(service):
         if not page_token:
             break
 
-    return sender_counts, total_emails
+    return sender_counts, domain_counts, total_emails
 
 # --- Main Execution and Display ---
 
 def main():
     try:
         service = get_gmail_service()
-        sender_counts, total_emails = get_senders_count(service)
+        sender_counts, domain_counts, total_emails = get_senders_count(service)
 
         # Sort the results by count in descending order
+        sorted_domains = sorted(domain_counts.items(), key=lambda item: item[1], reverse=True)
         sorted_senders = sorted(sender_counts.items(), key=lambda item: item[1], reverse=True)
-        
+
         print("\n" + "="*70)
         print("                     GMAIL SENDER ANALYSIS RESULTS")
         print("="*70)
         print(f"Total Emails Analyzed: {total_emails}")
         print(f"Unique Senders:        {len(sorted_senders)}")
+        print(f"Unique Domains:        {len(sorted_domains)}")
         print("="*70)
+
+        # Display top 50 domains
+        print("Top 50 Domains (Rank | Count | Domain):")
+        print("-"*70)
+
+        if not sorted_domains:
+            print("No domains found in your inbox.")
+        else:
+            for rank, (domain, count) in enumerate(sorted_domains[:50], 1):
+                # Format output for alignment
+                print(f"{rank:4}. | {count:6} | {domain}")
+
+            if len(sorted_domains) > 50:
+                print(f"\n... and {len(sorted_domains) - 50} more unique domains not shown.")
+
+        print("\n" + "="*70)
         print("Top Senders (Rank | Count | Email Address):")
-        
+
         if not sorted_senders:
             print("No senders found in your inbox.")
             return
