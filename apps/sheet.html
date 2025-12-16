@@ -68,6 +68,7 @@
             overflow: auto;
             background: white;
             position: relative;
+            user-select: none; /* Prevent text selection during drag */
         }
 
         .spreadsheet {
@@ -172,6 +173,14 @@
             display: inline-block;
         }
 
+        .chart-container h3 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            text-align: center;
+        }
+
         canvas {
             max-width: 600px;
             max-height: 400px;
@@ -239,6 +248,51 @@
             background: #95a5a6;
             color: white;
         }
+
+        .context-menu {
+            display: none;
+            position: fixed;
+            background: white;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            min-width: 150px;
+            padding: 4px 0;
+        }
+
+        .context-menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .context-menu-item:hover {
+            background: #ecf0f1;
+        }
+
+        .context-menu-item.disabled {
+            color: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .context-menu-item.disabled:hover {
+            background: transparent;
+        }
+
+        .context-menu-item.disabled {
+            pointer-events: none;
+        }
+
+        .context-menu-separator {
+            height: 1px;
+            background: #bdc3c7;
+            margin: 4px 0;
+        }
     </style>
 </head>
 <body>
@@ -301,6 +355,9 @@
 
             <label>Data Range (e.g., A1:B5):</label>
             <input type="text" id="chartRange" placeholder="A1:B5">
+            <small style="color: #666; display: block; margin-top: 5px;">
+                For pie charts: Select 2 columns (labels in first, values in second) or 1 column (values only)
+            </small>
 
             <label>Chart Title:</label>
             <input type="text" id="chartTitle" placeholder="My Chart">
@@ -312,15 +369,32 @@
         </div>
     </div>
 
+    <div id="contextMenu" class="context-menu">
+        <div class="context-menu-item" onclick="contextMenuCopy()">
+            <span>📋</span> Copy
+        </div>
+        <div class="context-menu-item" id="contextMenuPaste" onclick="contextMenuPaste()">
+            <span>📄</span> Paste
+        </div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" onclick="contextMenuDelete()">
+            <span>🗑️</span> Delete
+        </div>
+    </div>
+
     <script>
         // Spreadsheet state
         const ROWS = 50;
         const COLS = 26;
         let cells = {};
+        let charts = []; // Store chart data for save/load
         let selectedCell = null;
         let selectionStart = null;
         let selectedRange = null;
         let clipboard = null;
+        let isMouseDown = false;
+        let mouseDownCell = null;
+        let contextMenuCell = null;
 
         // Initialize spreadsheet
         function init() {
@@ -352,7 +426,53 @@
 
                     const cellDisplay = document.createElement('div');
                     cellDisplay.className = 'cell-display';
-                    cellDisplay.onclick = (e) => selectCell(row, col, e.shiftKey);
+                    cellDisplay.onmousedown = (e) => {
+                        if (e.button === 2) {
+                            // Right click - handled by contextmenu event
+                            return;
+                        }
+                        isMouseDown = true;
+                        mouseDownCell = { row, col };
+                        if (e.shiftKey && selectionStart) {
+                            // Extend selection from start point
+                            selectCell(row, col, true);
+                        } else {
+                            // Start new selection
+                            selectionStart = { row, col };
+                            selectCell(row, col, false);
+                        }
+                        e.preventDefault();
+                        e.stopPropagation();
+                    };
+                    cellDisplay.oncontextmenu = (e) => {
+                        e.preventDefault();
+                        contextMenuCell = { row, col };
+                        // If shift is held, extend selection; otherwise select the right-clicked cell
+                        if (e.shiftKey && selectionStart) {
+                            selectCell(row, col, true);
+                        } else {
+                            selectCell(row, col, false);
+                        }
+                        showContextMenu(e.clientX, e.clientY);
+                    };
+                    cellDisplay.onmouseenter = (e) => {
+                        if (isMouseDown && mouseDownCell) {
+                            // Drag selection - extend from mouseDownCell
+                            if (selectionStart) {
+                                selectCell(row, col, true);
+                            }
+                        }
+                    };
+                    cellDisplay.onclick = (e) => {
+                        // Only handle click if not part of drag
+                        if (!isMouseDown || (mouseDownCell && mouseDownCell.row === row && mouseDownCell.col === col)) {
+                            if (e.shiftKey && selectionStart) {
+                                selectCell(row, col, true);
+                            } else {
+                                selectCell(row, col, false);
+                            }
+                        }
+                    };
                     cellDisplay.ondblclick = () => editCell(row, col);
 
                     td.appendChild(cellDisplay);
@@ -377,6 +497,24 @@
             });
 
             selectCell(0, 0);
+            
+            // Handle mouse up globally to end drag selection
+            document.addEventListener('mouseup', () => {
+                isMouseDown = false;
+                mouseDownCell = null;
+            });
+
+            // Hide context menu when clicking elsewhere
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.context-menu')) {
+                    hideContextMenu();
+                }
+            });
+
+            // Hide context menu on scroll
+            document.addEventListener('scroll', () => {
+                hideContextMenu();
+            });
         }
 
         function getCellRef(row, col) {
@@ -386,8 +524,13 @@
         function parseCellRef(ref) {
             const match = ref.match(/^([A-Z]+)(\d+)$/);
             if (!match) return null;
-            const col = match[1].charCodeAt(0) - 65;
+            const colStr = match[1];
+            // Only support single-letter columns (A-Z) for now
+            if (colStr.length > 1) return null;
+            const col = colStr.charCodeAt(0) - 65;
             const row = parseInt(match[2]) - 1;
+            // Validate bounds
+            if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return null;
             return { row, col };
         }
 
@@ -398,7 +541,7 @@
             document.querySelectorAll('td.in-range').forEach(td => td.classList.remove('in-range'));
 
             if (shiftKey && selectionStart) {
-                // Range selection with shift
+                // Range selection with shift - extend from selectionStart
                 selectedRange = {
                     startRow: Math.min(selectionStart.row, row),
                     endRow: Math.max(selectionStart.row, row),
@@ -406,17 +549,20 @@
                     endCol: Math.max(selectionStart.col, col)
                 };
 
-                // Deselect previous single cell
-                if (selectedCell) {
-                    const prevTd = document.querySelector(`td[data-row="${selectedCell.row}"][data-col="${selectedCell.col}"]`);
-                    if (prevTd) prevTd.classList.remove('selected');
-                }
+                // Clear previous single cell selection
+                document.querySelectorAll('td.selected').forEach(td => td.classList.remove('selected'));
 
                 // Highlight range
                 for (let r = selectedRange.startRow; r <= selectedRange.endRow; r++) {
                     for (let c = selectedRange.startCol; c <= selectedRange.endCol; c++) {
                         const td = document.querySelector(`td[data-row="${r}"][data-col="${c}"]`);
-                        if (td) td.classList.add('in-range');
+                        if (td) {
+                            td.classList.add('in-range');
+                            // Highlight the end cell more prominently
+                            if (r === row && c === col) {
+                                td.classList.add('selected');
+                            }
+                        }
                     }
                 }
 
@@ -464,6 +610,7 @@
             input.onblur = () => {
                 if (!handled) {
                     updateCellValue(row, col, input.value);
+                    handled = true;
                 }
             };
 
@@ -646,20 +793,45 @@
         function formatCell(property, value) {
             if (!selectedCell) return;
 
-            const cellRef = getCellRef(selectedCell.row, selectedCell.col);
-
-            // Toggle for bold, italic, underline
-            if (property === 'fontWeight' && cells[cellRef].format.fontWeight === 'bold') {
-                cells[cellRef].format.fontWeight = 'normal';
-            } else if (property === 'fontStyle' && cells[cellRef].format.fontStyle === 'italic') {
-                cells[cellRef].format.fontStyle = 'normal';
-            } else if (property === 'textDecoration' && cells[cellRef].format.textDecoration === 'underline') {
-                cells[cellRef].format.textDecoration = 'none';
+            // Determine if we're formatting a range or single cell
+            const cellsToFormat = [];
+            
+            if (selectedRange) {
+                // Format entire range
+                for (let r = selectedRange.startRow; r <= selectedRange.endRow; r++) {
+                    for (let c = selectedRange.startCol; c <= selectedRange.endCol; c++) {
+                        cellsToFormat.push({ row: r, col: c });
+                    }
+                }
             } else {
-                cells[cellRef].format[property] = value;
+                // Format single cell
+                cellsToFormat.push({ row: selectedCell.row, col: selectedCell.col });
             }
 
-            renderCell(selectedCell.row, selectedCell.col);
+            // Apply formatting to all cells in the selection
+            cellsToFormat.forEach(({ row, col }) => {
+                const cellRef = getCellRef(row, col);
+                
+                if (!cells[cellRef]) {
+                    cells[cellRef] = { value: '', display: '', format: {} };
+                }
+                
+                const cellFormat = cells[cellRef].format;
+                
+                // Toggle for bold, italic, underline (same logic as original single-cell behavior)
+                if (property === 'fontWeight' && value === 'bold' && cellFormat.fontWeight === 'bold') {
+                    cellFormat.fontWeight = 'normal';
+                } else if (property === 'fontStyle' && value === 'italic' && cellFormat.fontStyle === 'italic') {
+                    cellFormat.fontStyle = 'normal';
+                } else if (property === 'textDecoration' && value === 'underline' && cellFormat.textDecoration === 'underline') {
+                    cellFormat.textDecoration = 'none';
+                } else {
+                    // Apply the format value
+                    cellFormat[property] = value;
+                }
+                
+                renderCell(row, col);
+            });
         }
 
         function copyCell() {
@@ -700,6 +872,88 @@
             }
         }
 
+        function deleteCell() {
+            if (!selectedCell) return;
+
+            if (selectedRange) {
+                // Delete range
+                for (let r = selectedRange.startRow; r <= selectedRange.endRow; r++) {
+                    for (let c = selectedRange.startCol; c <= selectedRange.endCol; c++) {
+                        const cellRef = getCellRef(r, c);
+                        cells[cellRef].value = '';
+                        cells[cellRef].display = '';
+                        updateCellValue(r, c, '');
+                    }
+                }
+            } else {
+                // Delete single cell
+                updateCellValue(selectedCell.row, selectedCell.col, '');
+            }
+            hideContextMenu();
+        }
+
+        function showContextMenu(x, y) {
+            const menu = document.getElementById('contextMenu');
+            
+            // Update paste button state
+            const pasteItem = document.getElementById('contextMenuPaste');
+            if (clipboard) {
+                pasteItem.classList.remove('disabled');
+                pasteItem.onclick = contextMenuPaste;
+            } else {
+                pasteItem.classList.add('disabled');
+                pasteItem.onclick = null;
+            }
+
+            // Show menu first to get dimensions
+            menu.style.display = 'block';
+            menu.style.visibility = 'hidden'; // Hide temporarily to measure
+            const menuWidth = menu.offsetWidth;
+            const menuHeight = menu.offsetHeight;
+            
+            // Calculate position with viewport bounds
+            let finalX = x;
+            let finalY = y;
+            
+            if (x + menuWidth > window.innerWidth) {
+                finalX = window.innerWidth - menuWidth - 5;
+            }
+            if (finalX < 5) finalX = 5;
+            
+            if (y + menuHeight > window.innerHeight) {
+                finalY = window.innerHeight - menuHeight - 5;
+            }
+            if (finalY < 5) finalY = 5;
+            
+            menu.style.left = finalX + 'px';
+            menu.style.top = finalY + 'px';
+            menu.style.visibility = 'visible';
+        }
+
+        function hideContextMenu() {
+            const menu = document.getElementById('contextMenu');
+            menu.style.display = 'none';
+            contextMenuCell = null;
+        }
+
+        function contextMenuCopy() {
+            // Use current selection (which was set when right-clicking)
+            copyCell();
+            hideContextMenu();
+        }
+
+        function contextMenuPaste() {
+            if (!clipboard) return;
+            // Use current selection (which was set when right-clicking)
+            pasteCell();
+            hideContextMenu();
+        }
+
+        function contextMenuDelete() {
+            // Use current selection (which was set when right-clicking)
+            deleteCell();
+        }
+
         function pasteCell() {
             if (!selectedCell || !clipboard) return;
 
@@ -733,13 +987,28 @@
         }
 
         function saveSpreadsheet() {
-            const data = JSON.stringify(cells, null, 2);
-            const blob = new Blob([data], { type: 'application/json' });
+            // Prompt for filename
+            const defaultName = 'spreadsheet.json';
+            const filename = prompt('Enter filename to save:', defaultName);
+            if (!filename) return; // User cancelled
+            
+            // Ensure .json extension
+            const finalFilename = filename.endsWith('.json') ? filename : filename + '.json';
+            
+            // Save both cells and charts
+            const data = {
+                cells: cells,
+                charts: charts,
+                version: '1.0'
+            };
+            
+            const jsonData = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonData], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
 
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'spreadsheet.json';
+            a.download = finalFilename;
             a.click();
 
             URL.revokeObjectURL(url);
@@ -758,7 +1027,20 @@
                 reader.onload = (e) => {
                     try {
                         const data = JSON.parse(e.target.result);
-                        cells = data;
+                        
+                        // Handle both old format (cells only) and new format (with charts)
+                        if (data.cells) {
+                            // New format with charts
+                            cells = data.cells;
+                            charts = Array.isArray(data.charts) ? data.charts : [];
+                        } else {
+                            // Legacy format - cells only
+                            cells = data;
+                            charts = [];
+                        }
+
+                        // Clear existing charts
+                        document.querySelectorAll('.chart-container').forEach(chart => chart.remove());
 
                         // Re-render all cells
                         for (let row = 0; row < ROWS; row++) {
@@ -766,6 +1048,11 @@
                                 renderCell(row, col);
                             }
                         }
+
+                        // Recreate charts
+                        charts.forEach(chartData => {
+                            createChart(chartData.type, chartData.data, chartData.title);
+                        });
 
                         recalculateAll();
                     } catch (err) {
@@ -780,7 +1067,25 @@
 
         // Chart functionality
         function showChartModal() {
+            // Auto-fill range if a selection exists
+            if (selectedRange) {
+                const startRef = getCellRef(selectedRange.startRow, selectedRange.startCol);
+                const endRef = getCellRef(selectedRange.endRow, selectedRange.endCol);
+                document.getElementById('chartRange').value = `${startRef}:${endRef}`;
+            } else if (selectedCell) {
+                // If single cell selected, try to detect a range around it
+                const cellRef = getCellRef(selectedCell.row, selectedCell.col);
+                document.getElementById('chartRange').value = cellRef;
+            } else {
+                document.getElementById('chartRange').value = '';
+            }
+            // Clear title field
+            document.getElementById('chartTitle').value = '';
             document.getElementById('chartModal').style.display = 'flex';
+            // Focus on the title input for easy entry
+            setTimeout(() => {
+                document.getElementById('chartTitle').focus();
+            }, 100);
         }
 
         function closeChartModal() {
@@ -807,26 +1112,78 @@
         }
 
         function getChartData(range) {
-            const [start, end] = range.split(':');
-            const startPos = parseCellRef(start);
-            const endPos = parseCellRef(end);
+            let startPos, endPos;
+            
+            if (range.includes(':')) {
+                const [start, end] = range.split(':');
+                startPos = parseCellRef(start);
+                endPos = parseCellRef(end);
+            } else {
+                // Single cell reference - try to detect range
+                startPos = parseCellRef(range);
+                if (!startPos) {
+                    throw new Error('Invalid range format');
+                }
+                // Try to find adjacent data, but stay within bounds
+                endPos = { 
+                    row: Math.min(startPos.row + 10, ROWS - 1), 
+                    col: Math.min(startPos.col + 1, COLS - 1) 
+                };
+            }
 
             if (!startPos || !endPos) {
                 throw new Error('Invalid range format');
             }
 
+            // Validate bounds
+            if (startPos.row < 0 || startPos.row >= ROWS || 
+                startPos.col < 0 || startPos.col >= COLS ||
+                endPos.row < 0 || endPos.row >= ROWS || 
+                endPos.col < 0 || endPos.col >= COLS) {
+                throw new Error('Range is out of bounds');
+            }
+
             const data = { labels: [], values: [] };
 
-            // Assume first column is labels, second column is values
-            for (let r = startPos.row; r <= endPos.row; r++) {
-                const labelRef = getCellRef(r, startPos.col);
-                const valueRef = getCellRef(r, startPos.col + 1);
+            // For pie charts: if range spans multiple columns, use first column for labels, second for values
+            // If range is single column, use row headers as labels and column as values
+            const numCols = endPos.col - startPos.col + 1;
+            const numRows = endPos.row - startPos.row + 1;
 
-                const label = cells[labelRef].display || cells[labelRef].value || '';
-                const value = parseFloat(cells[valueRef].display || cells[valueRef].value || '0');
+            if (numCols >= 2) {
+                // Two or more columns: first column = labels, second column = values
+                for (let r = startPos.row; r <= endPos.row && r < ROWS; r++) {
+                    if (startPos.col >= COLS || startPos.col + 1 >= COLS) break;
+                    const labelRef = getCellRef(r, startPos.col);
+                    const valueRef = getCellRef(r, startPos.col + 1);
 
-                data.labels.push(label);
-                data.values.push(value);
+                    const label = cells[labelRef] ? (cells[labelRef].display || cells[labelRef].value || '') : '';
+                    const value = cells[valueRef] ? parseFloat(cells[valueRef].display || cells[valueRef].value || '0') : 0;
+
+                    if (label || value !== 0) {
+                        data.labels.push(label || `Item ${data.labels.length + 1}`);
+                        data.values.push(value);
+                    }
+                }
+            } else {
+                // Single column: use cell values as data, generate labels
+                for (let r = startPos.row; r <= endPos.row && r < ROWS; r++) {
+                    if (startPos.col >= COLS) break;
+                    const valueRef = getCellRef(r, startPos.col);
+                    const cellData = cells[valueRef];
+                    
+                    if (cellData) {
+                        const value = parseFloat(cellData.display || cellData.value || '0');
+                        if (value !== 0 || cellData.value) {
+                            data.labels.push(cellData.value || `Item ${data.labels.length + 1}`);
+                            data.values.push(value);
+                        }
+                    }
+                }
+            }
+
+            if (data.labels.length === 0) {
+                throw new Error('No data found in selected range');
             }
 
             return data;
@@ -836,9 +1193,12 @@
             const container = document.createElement('div');
             container.className = 'chart-container';
 
-            const titleElem = document.createElement('h3');
-            titleElem.textContent = title || 'Chart';
-            container.appendChild(titleElem);
+            // Only add title if one is provided
+            if (title && title.trim()) {
+                const titleElem = document.createElement('h3');
+                titleElem.textContent = title.trim();
+                container.appendChild(titleElem);
+            }
 
             const canvas = document.createElement('canvas');
             canvas.width = 600;
@@ -848,6 +1208,13 @@
             document.querySelector('.spreadsheet-container').appendChild(container);
 
             drawChart(canvas, type, data);
+            
+            // Store chart data for saving
+            charts.push({
+                type: type,
+                data: data,
+                title: title || ''
+            });
         }
 
         function drawChart(canvas, type, data) {
@@ -873,14 +1240,22 @@
             const centerX = width / 2;
             const centerY = height / 2;
             const radius = Math.min(width, height) / 3;
+            const total = data.values.reduce((sum, val) => sum + Math.abs(val), 0);
+            
+            if (total === 0) {
+                ctx.fillStyle = '#000';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('No data to display', centerX, centerY);
+                return;
+            }
 
-            const total = data.values.reduce((sum, val) => sum + val, 0);
             let currentAngle = -Math.PI / 2;
-
             const colors = generateColors(data.values.length);
 
+            // Draw pie slices
             data.values.forEach((value, i) => {
-                const sliceAngle = (value / total) * 2 * Math.PI;
+                const sliceAngle = (Math.abs(value) / total) * 2 * Math.PI;
 
                 ctx.beginPath();
                 ctx.moveTo(centerX, centerY);
@@ -892,22 +1267,67 @@
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
+                // Draw percentage label on slice if slice is large enough
+                if (sliceAngle > 0.1) {
+                    const labelAngle = currentAngle + sliceAngle / 2;
+                    const labelRadius = radius * 0.7;
+                    const labelX = centerX + Math.cos(labelAngle) * labelRadius;
+                    const labelY = centerY + Math.sin(labelAngle) * labelRadius;
+                    const percentage = ((Math.abs(value) / total) * 100).toFixed(1) + '%';
+                    
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(percentage, labelX, labelY);
+                }
+
                 currentAngle += sliceAngle;
             });
 
-            // Draw legend
+            // Draw legend with values and percentages
+            const legendX = width - 200;
+            const legendY = 20;
+            const legendItemHeight = 25;
+            
             data.labels.forEach((label, i) => {
-                const y = 20 + i * 25;
+                const y = legendY + i * legendItemHeight;
+                const percentage = ((Math.abs(data.values[i]) / total) * 100).toFixed(1);
+                
+                // Color box
                 ctx.fillStyle = colors[i];
-                ctx.fillRect(10, y, 15, 15);
+                ctx.fillRect(legendX, y, 15, 15);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(legendX, y, 15, 15);
+                
+                // Label and value
                 ctx.fillStyle = '#000';
                 ctx.font = '12px Arial';
-                ctx.fillText(label + ': ' + data.values[i], 30, y + 12);
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                const labelText = label.length > 15 ? label.substring(0, 12) + '...' : label;
+                ctx.fillText(labelText, legendX + 20, y);
+                ctx.fillText(`${data.values[i]} (${percentage}%)`, legendX + 20, y + 14);
             });
         }
 
         function drawBarChart(ctx, data, width, height, padding) {
+            if (data.values.length === 0) {
+                ctx.fillStyle = '#000';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('No data to display', width / 2, height / 2);
+                return;
+            }
             const maxValue = Math.max(...data.values);
+            if (maxValue <= 0) {
+                ctx.fillStyle = '#000';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('No valid data to display', width / 2, height / 2);
+                return;
+            }
             const barWidth = (width - padding * 2) / data.values.length - 10;
             const chartHeight = height - padding * 2;
 
@@ -946,8 +1366,25 @@
         }
 
         function drawLineChart(ctx, data, width, height, padding) {
+            if (data.values.length === 0) {
+                ctx.fillStyle = '#000';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('No data to display', width / 2, height / 2);
+                return;
+            }
             const maxValue = Math.max(...data.values);
-            const pointSpacing = (width - padding * 2) / (data.values.length - 1);
+            if (maxValue <= 0) {
+                ctx.fillStyle = '#000';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('No valid data to display', width / 2, height / 2);
+                return;
+            }
+            // Handle single data point case
+            const pointSpacing = data.values.length > 1 
+                ? (width - padding * 2) / (data.values.length - 1)
+                : 0;
             const chartHeight = height - padding * 2;
 
             // Draw axes
@@ -965,7 +1402,7 @@
             ctx.beginPath();
 
             data.values.forEach((value, i) => {
-                const x = padding + i * pointSpacing;
+                const x = padding + (data.values.length > 1 ? i * pointSpacing : width / 2);
                 const y = height - padding - (value / maxValue) * chartHeight;
 
                 if (i === 0) {
@@ -975,7 +1412,9 @@
                 }
             });
 
-            ctx.stroke();
+            if (data.values.length > 1) {
+                ctx.stroke();
+            }
 
             // Draw points
             data.values.forEach((value, i) => {
@@ -1026,19 +1465,35 @@
             switch (e.key) {
                 case 'ArrowUp':
                     e.preventDefault();
-                    selectCell(selectedCell.row - 1, selectedCell.col);
+                    if (e.shiftKey && selectionStart) {
+                        selectCell(selectedCell.row - 1, selectedCell.col, true);
+                    } else {
+                        selectCell(selectedCell.row - 1, selectedCell.col, false);
+                    }
                     break;
                 case 'ArrowDown':
                     e.preventDefault();
-                    selectCell(selectedCell.row + 1, selectedCell.col);
+                    if (e.shiftKey && selectionStart) {
+                        selectCell(selectedCell.row + 1, selectedCell.col, true);
+                    } else {
+                        selectCell(selectedCell.row + 1, selectedCell.col, false);
+                    }
                     break;
                 case 'ArrowLeft':
                     e.preventDefault();
-                    selectCell(selectedCell.row, selectedCell.col - 1);
+                    if (e.shiftKey && selectionStart) {
+                        selectCell(selectedCell.row, selectedCell.col - 1, true);
+                    } else {
+                        selectCell(selectedCell.row, selectedCell.col - 1, false);
+                    }
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
-                    selectCell(selectedCell.row, selectedCell.col + 1);
+                    if (e.shiftKey && selectionStart) {
+                        selectCell(selectedCell.row, selectedCell.col + 1, true);
+                    } else {
+                        selectCell(selectedCell.row, selectedCell.col + 1, false);
+                    }
                     break;
                 case 'Enter':
                     e.preventDefault();
